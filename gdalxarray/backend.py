@@ -3,11 +3,13 @@ from xarray.backends import BackendEntrypoint, BackendArray
 from xarray.core import indexing
 from xarray.coding.times import decode_cf_datetime
 
+from collections.abc import Hashable, Iterable
+
 import numpy as np
 import dask.array as da
 from osgeo import gdal
 gdal.UseExceptions()
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any
 import threading
 
 ##https://gist.github.com/mdsumner/911c181467abb2c91d08544a94d8510a
