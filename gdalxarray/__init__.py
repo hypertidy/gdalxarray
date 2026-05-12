@@ -19,5 +19,5 @@ except ImportError as e:
         "for details."
     ) from e
 
-
+__version__ = "0.2.0"
 from .backend import GDALBackendEntrypoint
