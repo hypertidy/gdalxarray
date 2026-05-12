@@ -5,6 +5,12 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 path = "gdalxarray/__init__.py"
 
+[tool.hatch.build.targets.wheel]
+packages = ["gdalxarray"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"gdalxarray/py.typed" = "gdalxarray/py.typed"
+
 [project]
 name = "gdalxarray"
 dynamic = ["version"]
@@ -18,14 +24,14 @@ keywords = [
     "osgeo"
 ]
 readme = "README.md"
-license = {text = "Apache"}
+license = "Apache-2.0"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Natural Language :: English",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Oceanography", 
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -33,17 +39,24 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "packaging",
     "affine",
     "rasterix",
     "xarray>=2025.6",
-  #  "GDAL>=3.10.0",
+    "numpy",
+    "dask",
+    "xproj",
+    # GDAL must be installed separately; see INSTALL.md
 ]
 
+[project.urls]
+Homepage = "https://github.com/hypertidy/gdalxarray"
+Repository = "https://github.com/hypertidy/gdalxarray"
+Issues = "https://github.com/hypertidy/gdalxarray/issues"
+Changelog = "https://github.com/hypertidy/gdalxarray/blob/main/CHANGELOG.md"
 
-#[project.entry-points."xarray.backends"]
-#gdal = "gdalxarray.gdalxarray:GDALBackendEntrypoint"
+[project.entry-points."xarray.backends"]
+gdalxarray = "gdalxarray.backend:GDALBackendEntrypoint"

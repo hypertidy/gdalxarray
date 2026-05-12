@@ -16,6 +16,8 @@ from rasterix import RasterIndex
 #https://xarray.dev/blog/flexible-indexing#xprojcrsindex
 from xproj import CRSIndex
 
+import logging
+logger = logging.getLogger(__name__)
 
 def _is_time_coord(array_name, attrs, units):
     """Check if this is a time coordinate using CF conventions."""
@@ -36,7 +38,7 @@ class GDALBackendArray(BackendArray):
         self.filename = filename
         self.band_index = band_index
         self._local = threading.local()
-        print(f'filename: {filename}')
+        logger.debug("filename: %s", filename)
         # Open once to get metadata, then close
         ds = gdal.Open(filename, gdal.GA_ReadOnly)
         if ds is None:
@@ -157,7 +159,8 @@ class GDALBackendArray(BackendArray):
           return np.empty(shape, dtype=self._dtype)
       
       band = self._get_band()
-      print(f"read: yoff={y_start}, xoff={x_start}, ysize={y_size}, xsize={x_size}")
+      logger.debug("read: yoff=%s, xoff=%s, ysize=%s, xsize=%s", 
+         y_start, x_start, y_size, x_size)
       data = band.ReadAsArray(
           xoff=x_start,
           yoff=y_start,
@@ -269,8 +272,8 @@ class GDALMultiDimArray(BackendArray):
             count=counts,
             options=[f"CACHE_SIZE={str(num_bytes)}"]
       )
-      print(f"starts={starts}, counts={counts}, steps={steps}, shape={self.shape}, chunks={self._chunks}")
-
+      logger.debug("starts=%s, counts=%s, steps=%s, shape=%s, chunks=%s",
+             starts, counts, steps, self.shape, self._chunks)
         
       data = self.mdarray.ReadAsArray(
           array_start_idx=starts,
@@ -297,14 +300,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     
     def open_dataset(
         self,
-        filename_or_obj,
+        filename_or_obj: str,
         *,
-        drop_variables=None,
-        chunks={},
-        multidim=True,
-        group=None,
-        **kwargs
-    ):
+        drop_variables: Iterable[Hashable] | None = None,
+        chunks: dict[Hashable, int] | None = None,
+        multidim: bool = True,
+        group: str | None = None,
+    ) -> xr.Dataset:
         """
         Open a dataset using GDAL.
         
@@ -332,7 +334,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     
     def _open_raster(self, filename_or_obj, chunks, drop_variables):
         """Open using standard GDAL raster API."""
-        print(f'filename_or_obj: {filename_or_obj}')
+        logger.debug("filename_or_obj: %s", filename_or_obj)
         # Open with GDAL
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
         if dataset is None:
@@ -364,7 +366,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             
             # Create backend array
             backend_array = GDALBackendArray(filename_or_obj, band_idx)
-            #print(f'band{band_idx}')
+            logger.debug("band: %i", band_idx)
             # Wrap with Dask if chunks specified
             if chunks is not None:
                 if chunks == {}:
@@ -375,7 +377,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                     chunk_tuple = (block_size[1], block_size[0]) 
                     block_size = dataset.GetRasterBand(1).GetBlockSize()
                     dim_sizes = [dataset.RasterXSize, dataset.RasterYSize]
-                    print(f"shape={dim_sizes}(x,y), chunks={block_size}(y,x)")
+                    logger.debug("shape=%s(x,y), chunks=%s(y,x)", dim_sizes, block_size)
                 else:
                     chunk_tuple = tuple(
                         chunks.get(dim_name, -1) for dim_name in dim_names
@@ -532,7 +534,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds.encoding['gdal_dataset'] = dataset
         ds.encoding['gdal_group'] = target_group
     
-        ds.attrs['_gdal_arrays'] = {
+        ds.encoding['_gdal_arrays'] = {
                name: data_vars[name].encoding.get('gdal_backend') 
               for name in data_vars
                                   }

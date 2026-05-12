@@ -22,13 +22,19 @@ reticulate::use_python("~/workenv/bin/python3")
 
 The goal of gdalxarray is to integrate GDAL with xarray, especially for the multidimensional API which is still relatively underutilized.
 
+## Requirements
+
+Users *must* install GDAL through their system package manager, conda-forge, or Docker before `pip install gdalxarray`. There are no wheels on PyPi for GDAL, so we can't support binary installs.  We will have installation recommendations and advisable pathways to use docker etc, and feel free to contact about options by creating issues. 
+
+https://github.com/hypertidy/gdalxarray/issues
+
 ## Todo
 
 - [x] apply xarray indexes when relevant in Raster
 - [ ] apply xarray indexes when relevant in Multidim
 - [ ] define stance on representation of "default transform", and when GCPs, RPCs, or geolocation arrays are present
 - [ ] explore when we need to control driver choice (netcdf and hdf in particular)
-- [ ] explore registering as an xarray backend, via `engine = "gdal"`
+- [x] explore registering as an xarray backend, via `engine = "gdalxarray"`
 
 
 
@@ -206,6 +212,7 @@ bvm.sel(xt_ocean = slice(140, 150), yt_ocean = slice(-55, -45), st_ocean = slice
 ```
 
 
+
 ### A grib example
 
 What a joy to simply be able to use GDAL for what it is good at without intermediate layers. 
@@ -247,6 +254,21 @@ Indexes:
 
 ```
 
+## Run in docker
+
+We have a pre-defined docker image that is ready to build/install gdalxarray. 
+
+```bash
+docker run --rm -it ghcr.io/hypertidy/gdal-r-python:latest bash
+# inside the container:
+pip install gdalxarray   # (once on PyPI)
+# or for development:
+pip install -e /path/to/gdalxarray
+```
+
+
+(Add `--security-opt seccomp=unconfined` to docker run if you need remote NetCDF). 
+
 
 There's a lot more to do,  scaling works but I turned that off to test for now. .
 
@@ -274,6 +296,16 @@ backend.open_dataset("oisst.vrt", multidim = True)
 
 ```
 
+## Debugging
+
+
+Debug messages are sprinkled here and there, we might do more work to be more systematic here. 
+
+```python
+import logging
+logging.basicConfig()                                    # installs root handler at WARNING
+logging.getLogger("gdalxarray").setLevel(logging.DEBUG)  # let gdalxarray's DEBUG through
+```
 
 ## Code of Conduct
 
