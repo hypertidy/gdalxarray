@@ -8,7 +8,7 @@ import dask.array as da
 from osgeo import gdal
 gdal.UseExceptions()
 from typing import Iterable, Optional
-
+import threading
 
 ##https://gist.github.com/mdsumner/911c181467abb2c91d08544a94d8510a
 from affine import Affine
@@ -32,17 +32,27 @@ def _is_time_coord(array_name, attrs, units):
 class GDALBackendArray(BackendArray):
     """Wrapper around GDAL dataset that implements xarray's BackendArray interface."""
     
-    def __init__(self, dataset, band_index=1):
-        self.dataset = dataset
+    def __init__(self, filename, band_index=1):
+        self.filename = filename
         self.band_index = band_index
-        self.band = dataset.GetRasterBand(band_index)
+        self._local = threading.local()
+        print(f'filename: {filename}')
+        # Open once to get metadata, then close
+        ds = gdal.Open(filename, gdal.GA_ReadOnly)
+        if ds is None:
+            raise ValueError(f"Could not open {filename}")
+        band = ds.GetRasterBand(band_index)
         
-        # Get shape and dtype
-        self._shape = (dataset.RasterYSize, dataset.RasterXSize)
-        
-        # Map GDAL data types to numpy dtypes
-        gdal_dtype = self.band.DataType
-        self._dtype = self._gdal_to_numpy_dtype(gdal_dtype)
+        self._shape = (ds.RasterYSize, ds.RasterXSize)
+        self._dtype = self._gdal_to_numpy_dtype(band.DataType)
+        self._block_size = band.GetBlockSize()
+        ds = None  # close
+    
+    def _get_band(self):
+        if not hasattr(self._local, 'ds'):
+            self._local.ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+            self._local.band = self._local.ds.GetRasterBand(self.band_index)
+        return self._local.band
     
     def __dask_tokenize__(self):
         # Fast unique identifier - avoids Dask trying to hash the mdarray
@@ -146,7 +156,9 @@ class GDALBackendArray(BackendArray):
               shape.append(x_size)
           return np.empty(shape, dtype=self._dtype)
       
-      data = self.band.ReadAsArray(
+      band = self._get_band()
+      print(f"read: yoff={y_start}, xoff={x_start}, ysize={y_size}, xsize={x_size}")
+      data = band.ReadAsArray(
           xoff=x_start,
           yoff=y_start,
           win_xsize=x_size,
@@ -320,7 +332,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     
     def _open_raster(self, filename_or_obj, chunks, drop_variables):
         """Open using standard GDAL raster API."""
-        
+        print(f'filename_or_obj: {filename_or_obj}')
         # Open with GDAL
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
         if dataset is None:
@@ -351,20 +363,19 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 continue
             
             # Create backend array
-            backend_array = GDALBackendArray(dataset, band_idx)
+            backend_array = GDALBackendArray(filename_or_obj, band_idx)
             #print(f'band{band_idx}')
             # Wrap with Dask if chunks specified
             if chunks is not None:
                 if chunks == {}:
                     # FIXME what if no  bands available
                     # Use native block sizes from GDAL
+                    block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
+                    # Flip for (y, x) array order:
+                    chunk_tuple = (block_size[1], block_size[0]) 
                     block_size = dataset.GetRasterBand(1).GetBlockSize()
                     dim_sizes = [dataset.RasterXSize, dataset.RasterYSize]
-                    chunk_tuple = tuple(
-                        b if b > 0 else dim_sizes[i]
-                        for i, b in enumerate(block_size)
-                    )
-                    print(f"shape={dim_sizes}, chunks={block_size}")
+                    print(f"shape={dim_sizes}(x,y), chunks={block_size}(y,x)")
                 else:
                     chunk_tuple = tuple(
                         chunks.get(dim_name, -1) for dim_name in dim_names

@@ -1,8 +1,8 @@
-# Configuration file for creating a Conda Environment with dependencies needed for gdx.
+# Configuration file for creating a Conda Environment with dependencies needed for gdalxarray.
 # Create the environment by running the following command (after installing Miniconda):
 #   $ conda env create -f environment.yml
 
-name: gdx
+name: gdalxarray
 channels:
 - conda-forge
 dependencies:

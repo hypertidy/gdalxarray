@@ -14,13 +14,13 @@ reticulate::use_python("~/workenv/bin/python3")
 
 ```
 
-# gdx
+# gdalxarray
 
 <!-- badges: start -->
 
 <!-- badges: end -->
 
-The goal of gdx is to integrate GDAL with xarray, especially for the multidimensional API which is still relatively underutilized.
+The goal of gdalxarray is to integrate GDAL with xarray, especially for the multidimensional API which is still relatively underutilized.
 
 ## Todo
 
@@ -36,7 +36,7 @@ The goal of gdx is to integrate GDAL with xarray, especially for the multidimens
 Here's a basic example: 
 
 ```{python basic, eval = TRUE}
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 dsn =  "/vsicurl/https://projects.pawsey.org.au/idea-sealevel-glo-phy-l4-nrt-008-046/data.marine.copernicus.eu/SEALEVEL_GLO_PHY_L4_NRT_008_046/cmems_obs-sl_glo_phy-ssh_nrt_allsat-l4-duacs-0.125deg_P1D_202506/2025/08/nrt_global_allsat_phy_l4_20250825_20250825.nc"
 ds = backend.open_dataset(f'vrt://{dsn}?sd_name=vgos', chunks = {}, multidim = False)
@@ -129,7 +129,7 @@ ds1.sla.isel(longitude = 0, latitude = 1000).values
 What about a ZARR from CMEMS? 
 
 ```{python cmems, eval=FALSE}
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 dsn = 'ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-045/arco/SEALEVEL_GLO_PHY_L4_MY_008_047/cmems_obs-sl_glo_phy-ssh_my_allsat-l4-duacs-0.125deg_P1D_202411/timeChunked.zarr"'
 backend = GDALBackendEntrypoint()
 #ds = backend.open_dataset(filename_or_obj, multidim = True, chunks = None)
@@ -212,7 +212,7 @@ What a joy to simply be able to use GDAL for what it is good at without intermed
 
 
 ```python
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 backend.open_dataset("/vsicurl/https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20251031/16/core/blend.t16z.core.f260.co.grib2", multidim = False, chunks = None)
 ```
@@ -256,7 +256,7 @@ Template a list of netcdf files and mosaic them to VRT, then open with this xarr
 month = "202501"
 url = [f"/vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/{month}/oisst-avhrr-v02r01.{month}{(day+1):02d}.nc" for day in range(31)]
 gdal.Run("mdim mosaic", input = url, output =  "oisst.vrt", array = "sst")
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 
 backend.open_dataset("oisst.vrt", multidim = True)
@@ -277,4 +277,4 @@ backend.open_dataset("oisst.vrt", multidim = True)
 
 ## Code of Conduct
 
-Please note that the gdx project is released with a [Contributor Code of Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html). By contributing to this project, you agree to abide by its terms.
+Please note that the gdalxarray project is released with a [Contributor Code of Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html). By contributing to this project, you agree to abide by its terms.

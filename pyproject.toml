@@ -1,20 +1,23 @@
 [build-system]
-# Minimum requirements for the build system to execute.
-requires = ["setuptools", "wheel"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "gdalxarray/__init__.py"
 
 [project]
-name = "gdx"
-version = "0.1.0"
+name = "gdalxarray"
+dynamic = ["version"]
 description = "xarray extension for GDAL"
-maintainers = [
-    {name = "gdx Contributors"},
+authors = [
+    {name = "Michael Sumner", email = "mdsumner@gmail.com"},
 ]
 keywords = [
     "GDAL",
     "xarray",
     "osgeo"
 ]
-readme = "README.rst"
+readme = "README.md"
 license = {text = "Apache"}
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -43,4 +46,4 @@ dependencies = [
 
 
 #[project.entry-points."xarray.backends"]
-#gdal = "gdx.gdx:GDALBackendEntrypoint"
+#gdal = "gdalxarray.gdalxarray:GDALBackendEntrypoint"
