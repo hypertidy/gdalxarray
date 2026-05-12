@@ -58,7 +58,7 @@ class GDALBackendArray(BackendArray):
     
     def __dask_tokenize__(self):
         # Fast unique identifier - avoids Dask trying to hash the mdarray
-        return (type(self).__name__, id(self.mdarray))
+        return (type(self).__name__, id(self.dataset), self.band_index)
     
     @staticmethod
     def _gdal_to_numpy_dtype(gdal_dtype):
@@ -202,6 +202,9 @@ class GDALMultiDimArray(BackendArray):
     def dtype(self):
         return np.dtype(self._dtype)
     
+    def __dask_tokenize__(self):
+        return (type(self).__name__, id(self.mdarray))
+      
     def __getitem__(self, key):
      # Handle xarray's explicit indexing objects
      from xarray.core import indexing as xr_indexing
