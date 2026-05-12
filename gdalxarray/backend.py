@@ -398,7 +398,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 )
                 data = dask_array
             else:
-                data = backend_array
+                from xarray.core import indexing
+                data = indexing.LazilyIndexedArray(backend_array)
+
 
             # Get band metadata
             band_attrs = {
@@ -490,7 +492,8 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 )
                 data = dask_array
             else:
-                data = backend_array
+                from xarray.core import indexing
+                data = indexing.LazilyIndexedArray(backend_array)
 
 
             # Get attributes
