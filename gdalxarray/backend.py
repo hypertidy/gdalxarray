@@ -380,11 +380,14 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                     chunk_tuple = (block_size[1], block_size[0]) 
                     block_size = dataset.GetRasterBand(1).GetBlockSize()
                     dim_sizes = [dataset.RasterXSize, dataset.RasterYSize]
+                    # block_size is (xsize, ysize) from GDAL; flip to match ["y", "x"] order
+                    chunk_tuple = (
+                       block_size[1] if block_size[1] > 0 else dim_sizes[0],
+                       block_size[0] if block_size[0] > 0 else dim_sizes[1],)
                     logger.debug("shape=%s(x,y), chunks=%s(y,x)", dim_sizes, block_size)
                 else:
-                    chunk_tuple = tuple(
-                        chunks.get(dim_name, -1) for dim_name in dim_names
-                    )
+                    chunk_tuple = (
+                       chunks.get("y", -1), chunks.get("x", -1),)
                 dask_array = da.from_array(
                     backend_array,
                     chunks=chunk_tuple,
