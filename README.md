@@ -143,6 +143,10 @@ xds = backend.open_dataset(
     "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk",
     multidim=True,
 )
+
+print(xds.encoding.get("gdal_dataset").GetDriver().GetDescription())
+# 'Icechunk'
+
 print(xds)
 ```
 
