@@ -1,14 +1,24 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# gdx
+# gdalxarray
 
 <!-- badges: start -->
 
 <!-- badges: end -->
 
-The goal of gdx is to integrate GDAL with xarray, especially for the
-multidimensional API which is still relatively underutilized.
+The goal of gdalxarray is to integrate GDAL with xarray, especially for
+the multidimensional API which is still relatively underutilized.
+
+## Requirements
+
+Users *must* install GDAL through their system package manager,
+conda-forge, or Docker before `pip install gdalxarray`. There are no
+wheels on PyPi for GDAL, so we can’t support binary installs. We will
+have installation recommendations and advisable pathways to use docker
+etc, and feel free to contact about options by creating issues.
+
+<https://github.com/hypertidy/gdalxarray/issues>
 
 ## Todo
 
@@ -18,12 +28,13 @@ multidimensional API which is still relatively underutilized.
   GCPs, RPCs, or geolocation arrays are present
 - [ ] explore when we need to control driver choice (netcdf and hdf in
   particular)
-- [ ] explore registering as an xarray backend, via `engine = "gdal"`
+- [x] explore registering as an xarray backend, via
+  `engine = "gdalxarray"`
 
 Here’s a basic example:
 
 ``` python
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 dsn =  "/vsicurl/https://projects.pawsey.org.au/idea-sealevel-glo-phy-l4-nrt-008-046/data.marine.copernicus.eu/SEALEVEL_GLO_PHY_L4_NRT_008_046/cmems_obs-sl_glo_phy-ssh_nrt_allsat-l4-duacs-0.125deg_P1D_202506/2025/08/nrt_global_allsat_phy_l4_20250825_20250825.nc"
 ds = backend.open_dataset(f'vrt://{dsn}?sd_name=vgos', chunks = {}, multidim = False)
@@ -114,10 +125,68 @@ ds1.sla.isel(longitude = 0, latitude = 1000).values
 #> array([2404], dtype=int32)
 ```
 
-What about a ZARR from CMEMS?
+## Open ECMWF AIFS Single forecast (Icechunk on S3) with gdalxarray
+
+Note this requires the in-dev rouault/icechunk branch (as of
+2026-06-12).
 
 ``` python
-from gdx import GDALBackendEntrypoint
+import os
+os.environ["AWS_NO_SIGN_REQUEST"] =  "YES"
+os.environ["AWS_REGION"] =  "us-west-2"
+
+import gdalxarray
+from gdalxarray import GDALBackendEntrypoint
+
+backend = GDALBackendEntrypoint()
+xds = backend.open_dataset(
+    "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk",
+    multidim=True,
+)
+print(xds)
+```
+
+    <xarray.Dataset> Size: 14TB
+    Dimensions:                                     (init_time: 3205,
+                                                     latitude: 721, lead_time: 61,
+                                                     longitude: 1440)
+    Coordinates:
+      * init_time                                   (init_time) datetime64[ns] 26kB ...
+      * latitude                                    (latitude) float64 6kB 90.0 ....
+      * lead_time                                   (lead_time) int64 488B 0 ... ...
+      * longitude                                   (longitude) float64 12kB -180...
+    Data variables: (12/21)
+        dew_point_temperature_2m                    (init_time, lead_time, latitude, longitude) float32 812GB ...
+        downward_long_wave_radiation_flux_surface   (init_time, lead_time, latitude, longitude) float32 812GB ...
+        downward_short_wave_radiation_flux_surface  (init_time, lead_time, latitude, longitude) float32 812GB ...
+        expected_forecast_length                    (init_time) float32 13kB ...
+        geopotential_height_500hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+        geopotential_height_850hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+        ...                                          ...
+        total_cloud_cover_atmosphere                (init_time, lead_time, latitude, longitude) float32 812GB ...
+        valid_time                                  (init_time, lead_time) float32 782kB ...
+        wind_u_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
+        wind_u_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+        wind_v_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
+        wind_v_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+    Attributes:
+        attribution:          ECMWF AIFS Single forecast data processed by dynami...
+        dataset_id:           ecmwf-aifs-single-forecast
+        dataset_version:      0.1.0
+        description:          Weather forecasts from the ECMWF Artificial Intelli...
+        forecast_domain:      Forecast lead time 0-360 hours (0-15 days) ahead
+        forecast_resolution:  6 hourly
+        license:              CC-BY-4.0
+        name:                 ECMWF AIFS Single forecast
+        spatial_domain:       Global
+        spatial_resolution:   0.25 degrees (~20km)
+        time_domain:          Forecasts initialized 2024-04-01 00:00:00 UTC to Pr...
+        time_resolution:      Forecasts initialized every 6 hours
+
+## ZARR from CMEMS
+
+``` python
+from gdalxarray import GDALBackendEntrypoint
 dsn = 'ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-045/arco/SEALEVEL_GLO_PHY_L4_MY_008_047/cmems_obs-sl_glo_phy-ssh_my_allsat-l4-duacs-0.125deg_P1D_202411/timeChunked.zarr"'
 backend = GDALBackendEntrypoint()
 #ds = backend.open_dataset(filename_or_obj, multidim = True, chunks = None)
@@ -196,7 +265,7 @@ What a joy to simply be able to use GDAL for what it is good at without
 intermediate layers.
 
 ``` python
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 backend.open_dataset("/vsicurl/https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20251031/16/core/blend.t16z.core.f260.co.grib2", multidim = False, chunks = None)
 ```
@@ -228,6 +297,22 @@ backend.open_dataset("/vsicurl/https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend
       └ y
         crs      CRSIndex (crs=PROJCS["unnamed",GEOGCS["Coordinate System imported from GRIB file" ...)
 
+## Run in docker
+
+We have a pre-defined docker image that is ready to build/install
+gdalxarray.
+
+``` bash
+docker run --rm -it ghcr.io/hypertidy/gdal-r-python:latest bash
+# inside the container:
+pip install gdalxarray   # (once on PyPI)
+# or for development:
+pip install -e /path/to/gdalxarray
+```
+
+(Add `--security-opt seccomp=unconfined` to docker run if you need
+remote NetCDF).
+
 There’s a lot more to do, scaling works but I turned that off to test
 for now. .
 
@@ -238,7 +323,7 @@ this xarray backend. (Note this requires GDAL\>=3.12.0 ).
 month = "202501"
 url = [f"/vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/{month}/oisst-avhrr-v02r01.{month}{(day+1):02d}.nc" for day in range(31)]
 gdal.Run("mdim mosaic", input = url, output =  "oisst.vrt", array = "sst")
-from gdx import GDALBackendEntrypoint
+from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 
 backend.open_dataset("oisst.vrt", multidim = True)
@@ -255,8 +340,20 @@ backend.open_dataset("oisst.vrt", multidim = True)
 # 
 ```
 
+## Debugging
+
+Debug messages are sprinkled here and there, we might do more work to be
+more systematic here.
+
+``` python
+import logging
+logging.basicConfig()                                    # installs root handler at WARNING
+logging.getLogger("gdalxarray").setLevel(logging.DEBUG)  # let gdalxarray's DEBUG through
+```
+
 ## Code of Conduct
 
-Please note that the gdx project is released with a [Contributor Code of
+Please note that the gdalxarray project is released with a [Contributor
+Code of
 Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html).
 By contributing to this project, you agree to abide by its terms.

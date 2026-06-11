@@ -41,7 +41,7 @@ https://github.com/hypertidy/gdalxarray/issues
 
 Here's a basic example: 
 
-```{python basic, eval = TRUE}
+```{python basic, eval = F}
 from gdalxarray import GDALBackendEntrypoint
 backend = GDALBackendEntrypoint()
 dsn =  "/vsicurl/https://projects.pawsey.org.au/idea-sealevel-glo-phy-l4-nrt-008-046/data.marine.copernicus.eu/SEALEVEL_GLO_PHY_L4_NRT_008_046/cmems_obs-sl_glo_phy-ssh_nrt_allsat-l4-duacs-0.125deg_P1D_202506/2025/08/nrt_global_allsat_phy_l4_20250825_20250825.nc"
@@ -124,15 +124,77 @@ ds.band_1.isel(x = 0)
 
 we can access actual values
 
-```{python, eval = T}
+```{python, eval = F}
 ## the raw values for now
 ds.band_1.sel(x = 100, y = -50, method = "nearest").values
+#> array(441, dtype=int32)
 
 ds1.sla.isel(longitude = 0, latitude = 1000).values
-
+#> array([2404], dtype=int32)
 ```
 
-What about a ZARR from CMEMS? 
+
+## Open ECMWF AIFS Single forecast (Icechunk on S3) with gdalxarray
+
+Note this requires the in-dev rouault/icechunk branch (as of 2026-06-12). 
+
+
+```python
+import os
+os.environ["AWS_NO_SIGN_REQUEST"] =  "YES"
+os.environ["AWS_REGION"] =  "us-west-2"
+
+import gdalxarray
+from gdalxarray import GDALBackendEntrypoint
+
+backend = GDALBackendEntrypoint()
+xds = backend.open_dataset(
+    "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk",
+    multidim=True,
+)
+print(xds)
+```
+
+```
+<xarray.Dataset> Size: 14TB
+Dimensions:                                     (init_time: 3205,
+                                                 latitude: 721, lead_time: 61,
+                                                 longitude: 1440)
+Coordinates:
+  * init_time                                   (init_time) datetime64[ns] 26kB ...
+  * latitude                                    (latitude) float64 6kB 90.0 ....
+  * lead_time                                   (lead_time) int64 488B 0 ... ...
+  * longitude                                   (longitude) float64 12kB -180...
+Data variables: (12/21)
+    dew_point_temperature_2m                    (init_time, lead_time, latitude, longitude) float32 812GB ...
+    downward_long_wave_radiation_flux_surface   (init_time, lead_time, latitude, longitude) float32 812GB ...
+    downward_short_wave_radiation_flux_surface  (init_time, lead_time, latitude, longitude) float32 812GB ...
+    expected_forecast_length                    (init_time) float32 13kB ...
+    geopotential_height_500hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+    geopotential_height_850hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+    ...                                          ...
+    total_cloud_cover_atmosphere                (init_time, lead_time, latitude, longitude) float32 812GB ...
+    valid_time                                  (init_time, lead_time) float32 782kB ...
+    wind_u_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
+    wind_u_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+    wind_v_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
+    wind_v_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
+Attributes:
+    attribution:          ECMWF AIFS Single forecast data processed by dynami...
+    dataset_id:           ecmwf-aifs-single-forecast
+    dataset_version:      0.1.0
+    description:          Weather forecasts from the ECMWF Artificial Intelli...
+    forecast_domain:      Forecast lead time 0-360 hours (0-15 days) ahead
+    forecast_resolution:  6 hourly
+    license:              CC-BY-4.0
+    name:                 ECMWF AIFS Single forecast
+    spatial_domain:       Global
+    spatial_resolution:   0.25 degrees (~20km)
+    time_domain:          Forecasts initialized 2024-04-01 00:00:00 UTC to Pr...
+    time_resolution:      Forecasts initialized every 6 hours
+```
+
+## ZARR from CMEMS
 
 ```{python cmems, eval=FALSE}
 from gdalxarray import GDALBackendEntrypoint
