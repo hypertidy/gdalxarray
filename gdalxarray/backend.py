@@ -442,14 +442,17 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         if root_group is None:
             raise ValueError(f"No root group found in {filename_or_obj}")
         
-        # Navigate to specified group if provided
-        if group:
-            target_group = root_group.OpenGroup(group)
-            if target_group is None:
-                raise ValueError(f"Group {group} not found")
-        else:
-            target_group = root_group
-        
+        # Navigate to the requested group, handling None, "", "/", "a/b/c", "/a/b/c"
+        parts = [p for p in (group or "").strip("/").split("/") if p]
+        target_group = root_group
+        for part in parts:
+          target_group = target_group.OpenGroup(part)
+          if target_group is None:
+            raise ValueError(
+                f"Group component {part!r} not found in path {group!r}"
+            )
+    
+    
         # Get arrays from the group
         array_names = target_group.GetMDArrayNames()
         
