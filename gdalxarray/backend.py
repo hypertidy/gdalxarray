@@ -97,6 +97,9 @@ class GDALBackendArray(BackendArray):
         return np.prod(self._shape)
 
     def __getitem__(self, key):
+        import logging
+        logging.getLogger(__name__).debug("key type=%s key=%r", type(key).__name__, key)
+        
         # Handle xarray's explicit indexing objects
         from xarray.core import indexing as xr_indexing
         
@@ -208,6 +211,9 @@ class GDALMultiDimArray(BackendArray):
         return (type(self).__name__, id(self.mdarray))
       
     def __getitem__(self, key):
+     import logging
+     logging.getLogger(__name__).debug("__getitem__ key type=%s key=%r", type(key).__name__, key)
+     
      # Handle xarray's explicit indexing objects
      from xarray.core import indexing as xr_indexing
     
@@ -241,6 +247,12 @@ class GDALMultiDimArray(BackendArray):
             start = k.start if k.start is not None else 0
             stop = k.stop if k.stop is not None else self.shape[i]
             step = k.step if k.step is not None else 1
+            if step > 0 and stop < start:
+              start, stop = stop, start + 1
+            elif step < 0:
+              # explicit reverse: also canonicalise
+              start, stop, step = stop + 1, start + 1, -step
+              # (worry about this branch later if it ever fires)
             count = (stop - start + step - 1) // step
           elif isinstance(k, int) | isinstance(k, float):
               start = k
