@@ -1,0 +1,17 @@
+# mkdocs.yml at repo root
+site_name: gdalxarray
+site_url: https://hypertidy.github.io/gdalxarray
+repo_url: https://github.com/hypertidy/gdalxarray
+theme:
+  name: material
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+nav:
+  - Home: README.md
+  - Cookbook: docs/cookbook.md
+  - Install: INSTALL.md
+  - API Reference: docs/api.md
+  - Changelog: CHANGELOG.md
