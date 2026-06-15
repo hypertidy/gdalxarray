@@ -341,7 +341,7 @@
   <a href="#3-multidim-n-d-arrays-with-named-dimensions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Multidim — N-D arrays with named dimensions
+        3. Multidim- N-D arrays with named dimensions
       
     </span>
   </a>
@@ -599,7 +599,7 @@
   <a href="#3-multidim-n-d-arrays-with-named-dimensions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Multidim — N-D arrays with named dimensions
+        3. Multidim- N-D arrays with named dimensions
       
     </span>
   </a>
@@ -687,8 +687,8 @@
 <pre><code class="language-python">import xarray as xr
 ds = xr.open_dataset(path_or_uri, engine=&quot;gdalxarray&quot;)
 </code></pre>
-<p><code>gdalxarray</code> is a thin bridge between GDAL's reading capabilities — classic
-raster, multidimensional, and any of the virtualized stores GDAL knows about —
+<p><code>gdalxarray</code> is a thin bridge between GDAL's reading capabilities- classic
+raster, multidimensional, and any of the virtualized stores GDAL knows about-
 and xarray's labelled-array model. Lazy by default, optionally Dask-chunked,
 with native CRS and CF time handling.</p>
 <h2 id="installation">Installation</h2>
@@ -708,18 +708,18 @@ for NumPy ABI mismatches and Python version pinning.</p>
 and backend built on
 <a href="https://rasterio.readthedocs.io/">rasterio</a>, which wraps GDAL with its
 own Python conventions. For straightforward 2D/3D raster work it's the
-mature, widely-used choice — the <code>da.rio.reproject(...)</code> accessor pattern
+mature, widely-used choice- the <code>da.rio.reproject(...)</code> accessor pattern
 is well-known and well-tested.</p>
 <p><code>gdalxarray</code> goes directly to <code>osgeo.gdal</code>, with no <code>rasterio</code> layer
 in between. That choice matters in a few specific cases:</p>
 <ul>
-<li><strong>GDAL's multidimensional API is exposed natively</strong> — N-D arrays
+<li><strong>GDAL's multidimensional API is exposed natively</strong>- N-D arrays
   with named dimensions, not just (y, x) rasters with optional bands</li>
-<li><strong>Any GDAL virtualization composes</strong> — <code>/vsicurl/</code>, <code>/vsis3/</code>,
+<li><strong>Any GDAL virtualization composes</strong>- <code>/vsicurl/</code>, <code>/vsis3/</code>,
   <code>vrt://</code>, <code>ZARR:</code>, <code>NETCDF:</code>, classic VRT, multidim VRT</li>
 <li><strong>Codec and driver support tracks GDAL</strong> rather than whatever
-  rasterio re-exposes — Zarr v3, Icechunk, kerchunk-Parquet stores,
-  GRIB, HDF4/5 multidim — all readable via the GDAL drivers</li>
+  rasterio re-exposes- Zarr v3, Icechunk, kerchunk-Parquet stores,
+  GRIB, HDF4/5 multidim- all readable via the GDAL drivers</li>
 </ul>
 <p>For a single GeoTIFF or a STAC item, rioxarray is usually a better fit.
 For multidim cloud-native datasets, virtualized Zarr/Icechunk stores, or
@@ -731,7 +731,7 @@ is a composition of these with GDAL virtual paths.</p>
 <h3 id="1-classic-raster-bands-as-a-dimension-default">1. Classic raster, bands as a dimension (default)</h3>
 <p>For multispectral imagery, image stacks, and anything where bands are
 interchangeable axes. Produces a single <code>band_data</code> DataArray with
-dims <code>(band, y, x)</code> — the rioxarray-compatible layout.</p>
+dims <code>(band, y, x)</code>- the rioxarray-compatible layout.</p>
 <pre><code class="language-python">import xarray as xr
 
 ds = xr.open_dataset(&quot;image.tif&quot;, engine=&quot;gdalxarray&quot;, multidim=False)
@@ -761,7 +761,7 @@ ds
 #     salinity     (y, x) float32
 #     density      (y, x) float32
 </code></pre>
-<h3 id="3-multidim-n-d-arrays-with-named-dimensions">3. Multidim — N-D arrays with named dimensions</h3>
+<h3 id="3-multidim-n-d-arrays-with-named-dimensions">3. Multidim- N-D arrays with named dimensions</h3>
 <p>For datasets with their own dimension/coordinate structure: HDF5,
 NetCDF, multidim VRT, GRIB, Zarr (v2 and v3). Produces a Dataset whose
 dims and coords come from the source.</p>
@@ -772,7 +772,7 @@ ds[&quot;temperature&quot;].sel(time=&quot;2024-06&quot;, level=500).isel(latitu
 <h2 id="composing-with-gdal-virtual-paths">Composing with GDAL virtual paths</h2>
 <p>The three modes above combine with GDAL's virtualization layers to cover
 nearly every cloud-native and remote-data scenario. None of these
-require any code changes in <code>gdalxarray</code> — they're just different paths:</p>
+require any code changes in <code>gdalxarray</code>- they're just different paths:</p>
 <table>
 <thead>
 <tr>
@@ -795,7 +795,7 @@ require any code changes in <code>gdalxarray</code> — they're just different p
 </tr>
 <tr>
 <td><code>vrt://&lt;path&gt;?&lt;options&gt;</code></td>
-<td>Inline classic-raster VRT — subdataset selection, resampling, ...</td>
+<td>Inline classic-raster VRT- subdataset selection, resampling, ...</td>
 </tr>
 <tr>
 <td><code>NETCDF:&lt;path&gt;:&lt;var&gt;</code></td>

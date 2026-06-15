@@ -680,7 +680,7 @@
 <h1 id="installing-gdalxarray">Installing gdalxarray</h1>
 <p><code>gdalxarray</code> is a pure-Python package and is installed with <code>pip</code>. It depends on
 the GDAL Python bindings (<code>osgeo.gdal</code>), which are <strong>not</strong> installable via pip
-alone — GDAL is a C++ library and its Python bindings need a matching system
+alone - GDAL is a C++ library and its Python bindings need a matching system
 library, development headers, and a compiler.</p>
 <p>This is the same situation faced by <code>osgeo.gdal</code> itself, <code>rasterio</code> (which
 sidesteps it by shipping binary wheels), and other GDAL-based tools. We
@@ -741,7 +741,7 @@ dependencies:
 <code>gdal</code> package on conda-forge is split for size; add subpackages for the formats
 you need. The Zarr driver is included in the base.</p>
 <h2 id="system-package-manager">System package manager</h2>
-<p>If your system has a recent enough GDAL (≥ 3.12), use the system package and
+<p>If your system has a recent enough GDAL (&gt;= 3.12), use the system package and
 install the Python bindings separately:</p>
 <pre><code class="language-bash"># Ubuntu / Debian
 sudo apt install gdal-bin libgdal-dev python3-gdal
@@ -788,7 +788,7 @@ registered. Most commonly this means the package was used directly from a
 source checkout without <code>pip install</code>. Run <code>pip install -e .</code> from the repo
 root (for development) or <code>pip install gdalxarray</code> (for use).</p>
 <p><strong>GDAL version too old</strong>
-Some <code>gdalxarray</code> features (notably <code>gdal mdim mosaic</code>) require GDAL ≥ 3.12.
+Some <code>gdalxarray</code> features (notably <code>gdal mdim mosaic</code>) require GDAL &gt;= 3.12.
 Check with <code>python -c "from osgeo import gdal; print(gdal.__version__)"</code>.</p>
 <p><strong>numpy ABI mismatch</strong>
 Mixing pip-installed GDAL with conda numpy (or vice versa) can produce

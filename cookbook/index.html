@@ -668,7 +668,7 @@
 <h1 id="gdalxarray-cookbook">gdalxarray cookbook</h1>
 <p>Recipes for opening real cloud-native and remote datasets. These exercise
 the full composition of <code>gdalxarray</code>'s three open modes with GDAL's
-virtual-path layer. Many are dataset-specific — paths, regions, codec
+virtual-path layer. Many are dataset-specific - paths, regions, codec
 support, and auth requirements change over time.</p>
 <p>For an introduction to the package itself see the <a href="../README.md">README</a>.</p>
 <h2 id="network-and-config-setup">Network and config setup</h2>
@@ -680,14 +680,14 @@ files. A few common configs:</p>
 os.environ.setdefault(&quot;AWS_NO_SIGN_REQUEST&quot;, &quot;YES&quot;)
 os.environ.setdefault(&quot;AWS_REGION&quot;, &quot;us-west-2&quot;)  # adjust per bucket
 
-# Skip HEAD probes for /vsicurl/ — cleaner request patterns:
+# Skip HEAD probes for /vsicurl/ - cleaner request patterns:
 os.environ.setdefault(&quot;CPL_VSIL_CURL_USE_HEAD&quot;, &quot;NO&quot;)
 </code></pre>
 <p>These can also be set per-call via <code>gdal.SetConfigOption(...)</code> from the
 <code>osgeo.gdal</code> module; environment variables are easier to make
 reproducible in notebooks.</p>
 <h2 id="nci-thredds-rate-limited-https-source">NCI THREDDS (rate-limited HTTPS source)</h2>
-<p>Some institutional servers — notably NCI — rate-limit aggressive parallel
+<p>Some institutional servers - notably NCI - rate-limit aggressive parallel
 reads. The recipe is to cap GDAL's read parallelism:</p>
 <pre><code class="language-python">from osgeo import gdal
 gdal.SetConfigOption(&quot;GDAL_NUM_THREADS&quot;, &quot;4&quot;)
@@ -725,7 +725,7 @@ url = (
 ds = xr.open_dataset(url, engine=&quot;gdalxarray&quot;, multidim=True)
 ds[&quot;adt&quot;].sel(time=slice(&quot;2024-06-01&quot;, &quot;2024-06-10&quot;)).mean(dim=&quot;time&quot;).values
 </code></pre>
-<p>The <code>ZARR:"..."</code> prefix wraps a <code>/vsicurl/</code> HTTPS URL — GDAL's
+<p>The <code>ZARR:"..."</code> prefix wraps a <code>/vsicurl/</code> HTTPS URL - GDAL's
 virtualization composes through.</p>
 <hr />
 <h2 id="bran2023-ocean-reanalysis-via-kerchunk-parquet">BRAN2023 ocean reanalysis via kerchunk-Parquet</h2>
@@ -805,7 +805,7 @@ ds = xr.open_dataset(url, engine=&quot;gdalxarray&quot;, multidim=True)
 #   RuntimeError: Unsupported codec: numcodecs.pcodec
 </code></pre>
 <p>This is a <code>gdalxarray</code> limitation downstream of a GDAL one. Tracked
-upstream at <a href="https://github.com/osgeo/gdal">osgeo/gdal</a> — when GDAL
+upstream at <a href="https://github.com/osgeo/gdal">osgeo/gdal</a> - when GDAL
 adds pcodec, this works without changes here.</p>
 <hr />
 <h2 id="single-2d-slice-of-a-multidim-icechunk-store">Single 2D slice of a multidim Icechunk store</h2>
@@ -813,13 +813,13 @@ adds pcodec, this works without changes here.</p>
 2D face out of an N-D Icechunk store, usable from any classic GDAL tool:</p>
 <pre><code class="language-python">import xarray as xr
 
-# init_time=0, lead_time=0, latitude × longitude of one variable:
+# init_time=0, lead_time=0, latitude  longitude of one variable:
 url = (
     'ZARR:&quot;/vsiicechunk/{/vsis3/dynamical-ecmwf-aifs-single/'
     'ecmwf-aifs-single-forecast/v0.1.0.icechunk}&quot;:/wind_u_10m:{0}:{0}'
 )
 ds = xr.open_dataset(url, engine=&quot;gdalxarray&quot;, multidim=False)
-# Dataset with shape (1, 721, 1440) — band_data dim is 1, y is lat, x is lon
+# Dataset with shape (1, 721, 1440) - band_data dim is 1, y is lat, x is lon
 </code></pre>
 <p>This composition lets <code>gdal_translate</code>, <code>gdal_warp</code>, etc. consume
 specific forecast frames as if they were GeoTIFFs.</p>
