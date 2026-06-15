@@ -1,0 +1,919 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://hypertidy.github.io/gdalxarray/">
+      
+      
+      
+        <link rel="next" href="install/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>gdalxarray</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gdalxarray" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="gdalxarray" class="md-header__button md-logo" aria-label="gdalxarray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gdalxarray
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/hypertidy/gdalxarray" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="gdalxarray" class="md-nav__button md-logo" aria-label="gdalxarray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    gdalxarray
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/hypertidy/gdalxarray" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-exists-vs-rioxarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this exists (vs rioxarray)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-core-usage-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three core usage modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Three core usage modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-classic-raster-bands-as-a-dimension-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Classic raster, bands as a dimension (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-classic-raster-bands-as-separate-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Classic raster, bands as separate variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multidim-n-d-arrays-with-named-dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Multidim — N-D arrays with named dimensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composing-with-gdal-virtual-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing with GDAL virtual paths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-mode-for-which-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which mode for which format?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-exists-vs-rioxarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this exists (vs rioxarray)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-core-usage-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three core usage modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Three core usage modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-classic-raster-bands-as-a-dimension-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Classic raster, bands as a dimension (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-classic-raster-bands-as-separate-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Classic raster, bands as separate variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multidim-n-d-arrays-with-named-dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Multidim — N-D arrays with named dimensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composing-with-gdal-virtual-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing with GDAL virtual paths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-mode-for-which-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which mode for which format?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+<h1 id="gdalxarray">gdalxarray</h1>
+<!-- badges: start -->
+<p><a href="https://pypi.org/project/gdalxarray/"><img alt="PyPI" src="https://img.shields.io/pypi/v/gdalxarray.svg" /></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" /></a></p>
+<!-- badges: end -->
+
+<p>An xarray backend powered directly by GDAL.</p>
+<pre><code class="language-python">import xarray as xr
+ds = xr.open_dataset(path_or_uri, engine=&quot;gdalxarray&quot;)
+</code></pre>
+<p><code>gdalxarray</code> is a thin bridge between GDAL's reading capabilities — classic
+raster, multidimensional, and any of the virtualized stores GDAL knows about —
+and xarray's labelled-array model. Lazy by default, optionally Dask-chunked,
+with native CRS and CF time handling.</p>
+<h2 id="installation">Installation</h2>
+<p>GDAL has no usable PyPI wheels, so <code>pip install gdalxarray</code> alone is not
+enough. You need a working <code>osgeo.gdal</code> Python binding first. The
+recommended paths, in order of friction:</p>
+<ul>
+<li><strong>conda-forge</strong> (cross-platform, just works): <code>mamba install -c conda-forge gdal</code></li>
+<li><strong>Docker</strong> image with GDAL preinstalled (e.g. <code>ghcr.io/hypertidy/gdal-r-python:latest</code>)</li>
+<li><strong>System package manager</strong> (apt, brew) plus matching system Python bindings</li>
+</ul>
+<p>Then <code>pip install gdalxarray</code> for the engine itself. See
+<a href="INSTALL.md"><strong>INSTALL.md</strong></a> for the full guide, including troubleshooting
+for NumPy ABI mismatches and Python version pinning.</p>
+<h2 id="why-this-exists-vs-rioxarray">Why this exists (vs rioxarray)</h2>
+<p><a href="https://corteva.github.io/rioxarray/">rioxarray</a> is an xarray accessor
+and backend built on
+<a href="https://rasterio.readthedocs.io/">rasterio</a>, which wraps GDAL with its
+own Python conventions. For straightforward 2D/3D raster work it's the
+mature, widely-used choice — the <code>da.rio.reproject(...)</code> accessor pattern
+is well-known and well-tested.</p>
+<p><code>gdalxarray</code> goes directly to <code>osgeo.gdal</code>, with no <code>rasterio</code> layer
+in between. That choice matters in a few specific cases:</p>
+<ul>
+<li><strong>GDAL's multidimensional API is exposed natively</strong> — N-D arrays
+  with named dimensions, not just (y, x) rasters with optional bands</li>
+<li><strong>Any GDAL virtualization composes</strong> — <code>/vsicurl/</code>, <code>/vsis3/</code>,
+  <code>vrt://</code>, <code>ZARR:</code>, <code>NETCDF:</code>, classic VRT, multidim VRT</li>
+<li><strong>Codec and driver support tracks GDAL</strong> rather than whatever
+  rasterio re-exposes — Zarr v3, Icechunk, kerchunk-Parquet stores,
+  GRIB, HDF4/5 multidim — all readable via the GDAL drivers</li>
+</ul>
+<p>For a single GeoTIFF or a STAC item, rioxarray is usually a better fit.
+For multidim cloud-native datasets, virtualized Zarr/Icechunk stores, or
+anything where you want GDAL itself to be the source of truth,
+<code>gdalxarray</code> puts you closer to the metal.</p>
+<h2 id="three-core-usage-modes">Three core usage modes</h2>
+<p>The package has three ways to open a dataset, and almost everything else
+is a composition of these with GDAL virtual paths.</p>
+<h3 id="1-classic-raster-bands-as-a-dimension-default">1. Classic raster, bands as a dimension (default)</h3>
+<p>For multispectral imagery, image stacks, and anything where bands are
+interchangeable axes. Produces a single <code>band_data</code> DataArray with
+dims <code>(band, y, x)</code> — the rioxarray-compatible layout.</p>
+<pre><code class="language-python">import xarray as xr
+
+ds = xr.open_dataset(&quot;image.tif&quot;, engine=&quot;gdalxarray&quot;, multidim=False)
+ds[&quot;band_data&quot;]
+# &lt;xarray.DataArray 'band_data' (band: 3, y: 1024, x: 1024)&gt;
+#   ...
+
+# xarray idioms work as expected:
+mean_image = ds[&quot;band_data&quot;].mean(dim=&quot;band&quot;)
+just_nir = ds[&quot;band_data&quot;].sel(band=4)
+</code></pre>
+<h3 id="2-classic-raster-bands-as-separate-variables">2. Classic raster, bands as separate variables</h3>
+<p>For multiband rasters where each band carries a semantically distinct
+quantity (e.g. a NetCDF translated to multiband GeoTIFF where bands are
+different physical variables). Each band becomes a separate data variable
+named after its description.</p>
+<pre><code class="language-python">ds = xr.open_dataset(
+    &quot;multivariable.tif&quot;,
+    engine=&quot;gdalxarray&quot;,
+    multidim=False,
+    band_as_dim=False,
+)
+ds
+# &lt;xarray.Dataset&gt;
+# Data variables:
+#     temperature  (y, x) float32
+#     salinity     (y, x) float32
+#     density      (y, x) float32
+</code></pre>
+<h3 id="3-multidim-n-d-arrays-with-named-dimensions">3. Multidim — N-D arrays with named dimensions</h3>
+<p>For datasets with their own dimension/coordinate structure: HDF5,
+NetCDF, multidim VRT, GRIB, Zarr (v2 and v3). Produces a Dataset whose
+dims and coords come from the source.</p>
+<pre><code class="language-python">ds = xr.open_dataset(&quot;dataset.nc&quot;, engine=&quot;gdalxarray&quot;, multidim=True)
+ds[&quot;temperature&quot;].sel(time=&quot;2024-06&quot;, level=500).isel(latitude=slice(100, 200))
+</code></pre>
+<p><code>multidim=True</code> is the default for <code>engine="gdalxarray"</code>.</p>
+<h2 id="composing-with-gdal-virtual-paths">Composing with GDAL virtual paths</h2>
+<p>The three modes above combine with GDAL's virtualization layers to cover
+nearly every cloud-native and remote-data scenario. None of these
+require any code changes in <code>gdalxarray</code> — they're just different paths:</p>
+<table>
+<thead>
+<tr>
+<th>Prefix or syntax</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/vsicurl/&lt;url&gt;</code></td>
+<td>HTTP/HTTPS-served files</td>
+</tr>
+<tr>
+<td><code>/vsis3/&lt;bucket&gt;/&lt;key&gt;</code></td>
+<td>S3 (anonymous via <code>AWS_NO_SIGN_REQUEST=YES</code>)</td>
+</tr>
+<tr>
+<td><code>/vsigs/...</code></td>
+<td>Google Cloud Storage</td>
+</tr>
+<tr>
+<td><code>vrt://&lt;path&gt;?&lt;options&gt;</code></td>
+<td>Inline classic-raster VRT — subdataset selection, resampling, ...</td>
+</tr>
+<tr>
+<td><code>NETCDF:&lt;path&gt;:&lt;var&gt;</code></td>
+<td>Pick a subdataset from a NetCDF</td>
+</tr>
+<tr>
+<td><code>ZARR:"&lt;path&gt;":/&lt;array&gt;</code></td>
+<td>Open one array of a Zarr store as a classic raster</td>
+</tr>
+<tr>
+<td>Classic VRT (<code>.vrt</code>)</td>
+<td>XML file referencing other sources</td>
+</tr>
+<tr>
+<td>Multidim VRT (<code>.vrt</code>)</td>
+<td>N-D version, layered over NetCDF/HDF/Zarr sources</td>
+</tr>
+</tbody>
+</table>
+<p>A few illustrative compositions:</p>
+<pre><code class="language-python"># Public COG over HTTPS:
+xr.open_dataset(
+    &quot;/vsicurl/https://example.com/data.tif&quot;,
+    engine=&quot;gdalxarray&quot;, multidim=False,
+)
+
+# All variables of a CMEMS NetCDF on S3:
+xr.open_dataset(
+    &quot;NETCDF:/vsis3/bucket/path/file.nc&quot;,
+    engine=&quot;gdalxarray&quot;, multidim=True,
+)
+
+# A multidim VRT as a labelled coordinate-aware view over a raw NetCDF:
+xr.open_dataset(&quot;study_area.vrt&quot;, engine=&quot;gdalxarray&quot;, multidim=True)
+</code></pre>
+<h2 id="which-mode-for-which-format">Which mode for which format?</h2>
+<p>As a rough guide, <code>multidim=True</code> is the natural fit for formats whose
+own data model is N-dimensional with named axes:</p>
+<ul>
+<li>NetCDF (3 and 4)</li>
+<li>HDF5 / HDF4</li>
+<li>Multidim VRT</li>
+<li>GRIB / GRIB2</li>
+<li>Zarr (v2 and v3)</li>
+<li>Icechunk (where supported by your GDAL build)</li>
+</ul>
+<p><code>multidim=False</code> is the natural fit for image-like formats:</p>
+<ul>
+<li>GeoTIFF (including COG)</li>
+<li>JPEG, PNG, JPEG2000</li>
+<li>ERDAS Imagine (.img)</li>
+<li>Classic VRT files</li>
+<li>Anything GDAL identifies as a 2D-with-bands raster</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>Active development. The API has settled but small changes are
+possible before 1.0. See <a href="CHANGELOG.md"><code>CHANGELOG.md</code></a> for what's
+landed and the <a href="https://github.com/hypertidy/gdalxarray/issues">issue tracker</a>
+for what's next.</p>
+<p>For worked examples against real cloud-native data
+(BRAN2023 ocean reanalysis, ECMWF AIFS forecasts, CMEMS sea level,
+NOAA OISST), see <a href="docs/cookbook.md"><code>docs/cookbook.md</code></a>.</p>
+<h2 id="license">License</h2>
+<p>Apache-2.0.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
