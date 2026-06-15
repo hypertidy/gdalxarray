@@ -1,0 +1,45 @@
+# Docs publish: rebuilds and pushes to gh-pages on every push to main.
+# Uses ghcr.io/hypertidy/gdal-r-python which already has GDAL + Python
+# bindings installed, so no env-solving step is needed.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # required so the workflow can push to gh-pages
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/hypertidy/gdal-r-python:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure safe git directory
+        # GitHub Actions in a container runs as a different user than the
+        # checkout owner; tell git to trust the workspace.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install docs deps
+        run: |
+          pip install --upgrade --break-system-packages pip
+          pip install --break-system-packages mkdocs-material 'mkdocstrings[python]'
+          pip install --break-system-packages -e . --no-deps
+
+      - name: Verify environment
+        run: |
+          python -c "from osgeo import gdal; print('GDAL', gdal.__version__)"
+          python -c "import gdalxarray; print('gdalxarray', gdalxarray.__version__)"
+
+      - name: Build and deploy
+        run: mkdocs gh-deploy --force --clean
