@@ -1,14 +1,9 @@
-from importlib.metadata import version, PackageNotFoundError
+"""gdalxarray — an xarray backend powered by GDAL."""
 
+# Friendly error when GDAL bindings are missing — gdalxarray cannot work without
+# them and there is no fallback (osgeo.gdal has no PyPI wheels).
 try:
-    __version__ = version("gdalxarray")
-except PackageNotFoundError:
-    # package is not installed (running from source checkout)
-    __version__ = "0.0.0+unknown"
-
-
-try:
-    from osgeo import gdal
+    from osgeo import gdal as _gdal  # noqa: F401  (used by .backend, re-exported for env check)
 except ImportError as e:
     raise ImportError(
         "gdalxarray requires the GDAL Python bindings (osgeo.gdal), "
@@ -19,5 +14,10 @@ except ImportError as e:
         "for details."
     ) from e
 
-__version__ = "0.2.1"
+# Single source of truth for the version string. Hatchling parses this line
+# at build time via [tool.hatch.version] path = "gdalxarray/__init__.py".
+__version__ = "0.3.0"
+
 from .backend import GDALBackendEntrypoint
+
+__all__ = ["GDALBackendEntrypoint", "__version__"]

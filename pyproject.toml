@@ -60,3 +60,28 @@ Changelog = "https://github.com/hypertidy/gdalxarray/blob/main/CHANGELOG.md"
 
 [project.entry-points."xarray.backends"]
 gdalxarray = "gdalxarray.backend:GDALBackendEntrypoint"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes (unused imports, undefined names)
+    "I",     # isort (import sorting)
+    "B",     # bugbear (mutable defaults, bare except, etc.)
+    "UP",    # pyupgrade (modern syntax)
+    "SIM",   # simplify (clearer code)
+]
+ignore = [
+    "E501",  # line too long — formatter handles it
+    "E402",  # module-level imports not at top of file (some intentional in __init__)
+    "SIM108", # ternary expression preference (sometimes if/else reads better)
+]
+
+[tool.ruff.format]
+# Keep formatter compatible with `black` style; use ruff format in pre-commit.
+quote-style = "double"
+indent-style = "space"
