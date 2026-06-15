@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subdataset paths and pointing at `multidim=True`. Previously this
   produced a confusing empty 512×512 stub Dataset. Mirrors what
   `terra::rast()` does on the R side: shows the user the structure
-  they actually have and how to choose. (#issue-classic-raster-helpful)
+  they actually have and how to choose. 
 
 ## [0.3.0] - 2026-06-15
 

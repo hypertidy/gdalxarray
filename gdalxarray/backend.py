@@ -582,6 +582,26 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         if dataset is None:
             raise ValueError(f"Could not open {filename_or_obj} with GDAL")
 
+        # If the file presents no raster bands but has subdatasets, the user
+        # has opened a multidim source in classic mode. Refuse with a helpful
+        # listing rather than silently returning an empty 512x512 stub
+        # Dataset (which GDAL's default raster info produces for these files).
+        if dataset.RasterCount == 0:
+            subdatasets = dataset.GetSubDatasets()
+            if subdatasets:
+                lines = [f"\n  {path}\n      {desc}" for path, desc in subdatasets]
+                raise ValueError(
+                    f"{filename_or_obj!r} has no raster bands at the top level "
+                    f"but contains {len(subdatasets)} subdataset(s). "
+                    f"Use multidim=True to read the full hierarchy as an xarray "
+                    f"Dataset, or pass one of the subdataset paths below as the "
+                    f"filename to read a single 2D view in classic mode:" + "".join(lines)
+                )
+            raise ValueError(
+                f"{filename_or_obj!r} opens but has no raster bands and no "
+                f"subdatasets. Cannot be read as a classic raster."
+            )
+
         geotransform = dataset.GetGeoTransform()
         index = RasterIndex.from_transform(
             Affine.from_gdal(*geotransform),

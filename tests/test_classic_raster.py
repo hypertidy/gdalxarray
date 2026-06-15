@@ -5,7 +5,7 @@ from __future__ import annotations
 import dask.array as da
 import numpy as np
 import pytest
-
+from pathlib import Path
 from gdalxarray import GDALBackendEntrypoint
 
 
@@ -152,3 +152,53 @@ def test_provenance_in_encoding(backend, synthetic_geotiff):
     ds = backend.open_dataset(synthetic_geotiff, multidim=False)
     assert ds.encoding.get("source") == synthetic_geotiff
     assert ds.encoding.get("gdal_driver") == "GTiff"
+
+
+# -- Stub-Dataset policy --------------------------------------------------
+
+
+def test_subdataset_file_raises_helpful_error(backend, foo5_vrt):
+    """A multidim source opened in classic mode should refuse, not return a stub.
+
+    Three possible error paths, all acceptable:
+
+    * GDAL itself refuses the file ("not recognized as being in a supported
+      file format") — this is the case for multidim-only formats like a
+      multidim VRT, where the classic driver can't open it at all.
+    * The file opens but reports zero bands and subdataset entries, which
+      gdalxarray catches and raises a ValueError listing the subdatasets
+      and suggesting multidim=True.
+    * The file opens but has no bands and no subdatasets — a separate
+      ValueError.
+
+    What must NOT happen: the silent empty 512x512 stub Dataset.
+    """
+    import pytest
+
+    with pytest.raises((ValueError, RuntimeError)) as excinfo:
+        backend.open_dataset(foo5_vrt, multidim=False)
+    msg = str(excinfo.value).lower()
+    assert any(
+        kw in msg
+        for kw in (
+            "multidim=true",
+            "subdataset",
+            "no raster bands",
+            "could not open",
+            "not recognized",  # GDAL's own driver-refusal message
+            "not recognised",  # en_GB spelling, just in case
+        )
+    ), f"unexpected error message: {excinfo.value!r}"
+
+
+
+def test_netcdf_classic_lists_subdatasets(backend):
+    """Helpful-error branch: NetCDF with subdatasets gets a useful refusal."""
+    nc_path = Path(__file__).parent / "data" / "foo_5dimensional.nc"
+    if not nc_path.exists():
+        pytest.skip("foo_5dimensional.nc not present")
+    with pytest.raises(ValueError) as excinfo:
+        backend.open_dataset(str(nc_path), multidim=False)
+    msg = str(excinfo.value)
+    assert "subdataset" in msg.lower()
+    assert "multidim=True" in msg
