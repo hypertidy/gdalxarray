@@ -29,7 +29,7 @@ def _anonymous_s3():
 
 
 def test_oisst_netcdf_over_vsicurl():
-    """NOAA OISST daily file via /vsicurl/ — small, fast, public."""
+    """NOAA OISST daily file via /vsicurl/ - small, fast, public."""
     url = (
         "/vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-"
         "optimum-interpolation/v2.1/access/avhrr/202501/"
@@ -40,7 +40,7 @@ def test_oisst_netcdf_over_vsicurl():
 
 
 #def test_aifs_icechunk_on_s3():
-#    """ECMWF AIFS forecast Icechunk store — confirms /vsiicechunk/ works."""
+#    """ECMWF AIFS forecast Icechunk store - confirms /vsiicechunk/ works."""
 #    os.environ.setdefault("AWS_REGION", "us-west-2")
 #    url = "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk"
 #    ds = xr.open_dataset(url, engine="gdalxarray", multidim=True)

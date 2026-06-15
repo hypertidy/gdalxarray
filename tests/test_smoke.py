@@ -11,7 +11,7 @@ def test_import():
 
     assert hasattr(gdalxarray, "__version__")
     assert gdalxarray.__version__ != "0.0.0+unknown", (
-        "version stamping failed — check [tool.hatch.version] path and "
+        "version stamping failed - check [tool.hatch.version] path and "
         "__version__ literal in __init__.py"
     )
 
@@ -30,7 +30,7 @@ def test_engine_registered():
 
 
 def test_entrypoint_metadata_present():
-    """Importlib.metadata sees the entry point — what xarray uses internally."""
+    """Importlib.metadata sees the entry point - what xarray uses internally."""
     from importlib.metadata import entry_points
 
     eps = entry_points(group="xarray.backends")

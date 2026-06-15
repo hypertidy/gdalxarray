@@ -2,9 +2,9 @@
 
 Three BackendArray classes wrap GDAL's three reading modes:
 
-* ``GDALBackendArray``   — a single band of a classic raster
-* ``GDALMultiBandArray`` — all bands of a classic raster as a (band, y, x) cube
-* ``GDALMultiDimArray``  — a multidimensional array via GDAL's multidim API
+* ``GDALBackendArray``   - a single band of a classic raster
+* ``GDALMultiBandArray`` - all bands of a classic raster as a (band, y, x) cube
+* ``GDALMultiDimArray``  - a multidimensional array via GDAL's multidim API
 
 ``GDALBackendEntrypoint`` is registered as the ``gdalxarray`` xarray engine and
 dispatches to one of two open paths depending on the ``multidim`` flag.
@@ -205,7 +205,7 @@ class GDALMultiBandArray(BackendArray):
 
     Used by ``_open_raster`` when ``band_as_dim=True`` (the default). Reading
     multiple bands at once via ``dataset.ReadAsArray(band_list=...)`` lets
-    GDAL handle BIP/BIL/BSQ interleaving internally — typically faster than
+    GDAL handle BIP/BIL/BSQ interleaving internally - typically faster than
     iterating per-band.
     """
 
@@ -388,7 +388,7 @@ class GDALMultiDimArray(BackendArray):
 
     def __init__(self, mdarray, _parent_dataset=None, _parent_group=None):
         self.mdarray = mdarray
-        # Keep parent objects alive — without these refs the mdarray can be
+        # Keep parent objects alive - without these refs the mdarray can be
         # invalidated when the user-facing ds goes out of scope mid-session.
         self._parent_dataset = _parent_dataset
         self._parent_group = _parent_group
@@ -442,7 +442,7 @@ class GDALMultiDimArray(BackendArray):
                 step = k.step if k.step is not None else 1
                 if step > 0 and stop < start:
                     # xarray canonicalises reverse-slice on decreasing coords as
-                    # slice(stop<start) — read forward, let xarray flip display
+                    # slice(stop<start) - read forward, let xarray flip display
                     start, stop = stop, start + 1
                 elif step < 0:
                     start, stop, step = stop + 1, start + 1, -step
@@ -524,7 +524,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
     def __init__(self):
         # Opt the process into GDAL Python exceptions on first entrypoint use,
-        # rather than at module import — keeps the side-effect scoped to actual
+        # rather than at module import - keeps the side-effect scoped to actual
         # use of the backend. Guard against repeated calls.
         if not gdal.GetUseExceptions():
             gdal.UseExceptions()
@@ -785,7 +785,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             try:
                 mdarray = target_group.OpenMDArray(array_name)
             except RuntimeError as e:
-                # e.g. unsupported codec (numcodecs.pcodec) — skip rather than abort
+                # e.g. unsupported codec (numcodecs.pcodec) - skip rather than abort
                 logger.warning("Skipping array %r: %s", array_name, e)
                 continue
             if mdarray is None:
@@ -854,7 +854,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds = xr.Dataset(data_vars, coords=coords, attrs=group_attrs)
 
         # Serialization-safe provenance hints (strings only). Live GDAL refs
-        # are held inside the backend arrays themselves — no live objects in
+        # are held inside the backend arrays themselves - no live objects in
         # encoding (where to_netcdf() etc. would trip over them).
         ds.encoding["source"] = filename_or_obj
         if driver_name:

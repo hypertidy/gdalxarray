@@ -1,6 +1,6 @@
 # Release workflow: triggered by version tags (v0.3.0 etc.).
 # Builds wheel + sdist and publishes to PyPI via Trusted Publishing (OIDC).
-# No API tokens needed — configure once at:
+# No API tokens needed - configure once at:
 #   https://pypi.org/manage/account/publishing/
 # with publisher: hypertidy/gdalxarray, workflow: release.yml, env: pypi
 name: Release

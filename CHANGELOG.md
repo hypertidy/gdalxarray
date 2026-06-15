@@ -1,9 +1,5 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
@@ -12,23 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Classic-raster open (`multidim=False`) on a file with no bands but
   subdatasets now raises a `ValueError` listing the available
   subdataset paths and pointing at `multidim=True`. Previously this
-  produced a confusing empty 512×512 stub Dataset. Mirrors what
-  `terra::rast()` does on the R side: shows the user the structure
-  they actually have and how to choose. 
+  produced an empty 512x512 stub Dataset. 
 
 ## [0.3.0] - 2026-06-15
 
 ### Added
 
 - `band_as_dim` parameter on `open_dataset` (classic raster mode, default `True`).
-  Bands now become an xarray `band` dimension on a single `band_data` DataArray —
-  the rioxarray-compatible idiom — letting `da.mean(dim="band")`, `da.sel(band=...)`
-  and similar xarray operations work naturally. Pass `band_as_dim=False` for the
-  legacy per-band-variable layout, which is preferable when bands carry
-  semantically distinct quantities.
+  Bands now become an xarray `band` dimension on a single `band_data` DataArray. 
+  Pass `band_as_dim=False` for per-band-variable layout. 
 - New `GDALMultiBandArray` BackendArray reading via
   `dataset.ReadAsArray(band_list=...)`, letting GDAL handle BIP/BIL/BSQ
-  interleaving internally — typically faster than iterating per-band.
+  interleaving internally. 
 - Lazy-by-default for classic raster mode: `chunks=None` now returns a
   `LazilyIndexedArray`-wrapped Dataset rather than eagerly reading.
 - `ds.encoding["source"]` and `ds.encoding["gdal_driver"]` provenance strings
@@ -60,9 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Dataset.ReadAsArray` call in `GDALMultiBandArray` now uses `xsize`/`ysize`
   (the Dataset API) rather than `win_xsize`/`win_ysize` (which are the Band API).
 - Reverse-slice canonicalisation across all axes in all three BackendArray
-  classes — fixes failures when xarray sends `slice(stop, start, 1)` for
+  classes - fixes failures when xarray sends `slice(stop, start, 1)` for
   selections on decreasing coordinates (very common in atmospheric data with
-  latitude 90 → -90).
+  latitude 90 -> -90).
 - `GDALBackendArray.__dask_tokenize__` no longer references a non-existent
   `self.dataset` attribute. Was latent (only fired on certain Dask graph
   hashing paths) but would have raised AttributeError when it did.
@@ -101,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Slice index parsing where `0` was incorrectly treated as `None` due to
-  Python's falsy evaluation (`k.start or 0` → `k.start if k.start is not None else 0`).
+  Python's falsy evaluation (`k.start or 0` -> `k.start if k.start is not None else 0`).
 - Re-enabled `AdviseRead` for chunk-aligned prefetching on remote datasets.
 
 ## [0.1.0] - 2026-01-20

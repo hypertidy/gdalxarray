@@ -89,7 +89,7 @@ select = [
     "SIM",   # simplify (clearer code)
 ]
 ignore = [
-    "E501",  # line too long — formatter handles it
+    "E501",  # line too long - formatter handles it
     "E402",  # module-level imports not at top of file (some intentional in __init__)
     "SIM108", # ternary expression preference (sometimes if/else reads better)
 ]

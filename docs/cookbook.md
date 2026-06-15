@@ -2,7 +2,7 @@
 
 Recipes for opening real cloud-native and remote datasets. These exercise
 the full composition of `gdalxarray`'s three open modes with GDAL's
-virtual-path layer. Many are dataset-specific — paths, regions, codec
+virtual-path layer. Many are dataset-specific - paths, regions, codec
 support, and auth requirements change over time.
 
 For an introduction to the package itself see the [README](../README.md).
@@ -19,7 +19,7 @@ import os
 os.environ.setdefault("AWS_NO_SIGN_REQUEST", "YES")
 os.environ.setdefault("AWS_REGION", "us-west-2")  # adjust per bucket
 
-# Skip HEAD probes for /vsicurl/ — cleaner request patterns:
+# Skip HEAD probes for /vsicurl/ - cleaner request patterns:
 os.environ.setdefault("CPL_VSIL_CURL_USE_HEAD", "NO")
 ```
 
@@ -29,7 +29,7 @@ reproducible in notebooks.
 
 ## NCI THREDDS (rate-limited HTTPS source)
 
-Some institutional servers — notably NCI — rate-limit aggressive parallel
+Some institutional servers - notably NCI - rate-limit aggressive parallel
 reads. The recipe is to cap GDAL's read parallelism:
 
 ```python
@@ -82,7 +82,7 @@ ds = xr.open_dataset(url, engine="gdalxarray", multidim=True)
 ds["adt"].sel(time=slice("2024-06-01", "2024-06-10")).mean(dim="time").values
 ```
 
-The `ZARR:"..."` prefix wraps a `/vsicurl/` HTTPS URL — GDAL's
+The `ZARR:"..."` prefix wraps a `/vsicurl/` HTTPS URL - GDAL's
 virtualization composes through.
 
 ---
@@ -180,7 +180,7 @@ ds = xr.open_dataset(url, engine="gdalxarray", multidim=True)
 ```
 
 This is a `gdalxarray` limitation downstream of a GDAL one. Tracked
-upstream at [osgeo/gdal](https://github.com/osgeo/gdal) — when GDAL
+upstream at [osgeo/gdal](https://github.com/osgeo/gdal) - when GDAL
 adds pcodec, this works without changes here.
 
 ---
@@ -193,13 +193,13 @@ GDAL supports a composable VRT-style path syntax for picking a single
 ```python
 import xarray as xr
 
-# init_time=0, lead_time=0, latitude × longitude of one variable:
+# init_time=0, lead_time=0, latitude  longitude of one variable:
 url = (
     'ZARR:"/vsiicechunk/{/vsis3/dynamical-ecmwf-aifs-single/'
     'ecmwf-aifs-single-forecast/v0.1.0.icechunk}":/wind_u_10m:{0}:{0}'
 )
 ds = xr.open_dataset(url, engine="gdalxarray", multidim=False)
-# Dataset with shape (1, 721, 1440) — band_data dim is 1, y is lat, x is lon
+# Dataset with shape (1, 721, 1440) - band_data dim is 1, y is lat, x is lon
 ```
 
 This composition lets `gdal_translate`, `gdal_warp`, etc. consume

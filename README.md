@@ -14,8 +14,8 @@ import xarray as xr
 ds = xr.open_dataset(path_or_uri, engine="gdalxarray")
 ```
 
-`gdalxarray` is a thin bridge between GDAL's reading capabilities — classic
-raster, multidimensional, and any of the virtualized stores GDAL knows about —
+`gdalxarray` is a thin bridge between GDAL's reading capabilities- classic
+raster, multidimensional, and any of the virtualized stores GDAL knows about-
 and xarray's labelled-array model. Lazy by default, optionally Dask-chunked,
 with native CRS and CF time handling.
 
@@ -39,19 +39,19 @@ for NumPy ABI mismatches and Python version pinning.
 and backend built on
 [rasterio](https://rasterio.readthedocs.io/), which wraps GDAL with its
 own Python conventions. For straightforward 2D/3D raster work it's the
-mature, widely-used choice — the `da.rio.reproject(...)` accessor pattern
+mature, widely-used choice- the `da.rio.reproject(...)` accessor pattern
 is well-known and well-tested.
 
 `gdalxarray` goes directly to `osgeo.gdal`, with no `rasterio` layer
 in between. That choice matters in a few specific cases:
 
-- **GDAL's multidimensional API is exposed natively** — N-D arrays
+- **GDAL's multidimensional API is exposed natively**- N-D arrays
   with named dimensions, not just (y, x) rasters with optional bands
-- **Any GDAL virtualization composes** — `/vsicurl/`, `/vsis3/`,
+- **Any GDAL virtualization composes**- `/vsicurl/`, `/vsis3/`,
   `vrt://`, `ZARR:`, `NETCDF:`, classic VRT, multidim VRT
 - **Codec and driver support tracks GDAL** rather than whatever
-  rasterio re-exposes — Zarr v3, Icechunk, kerchunk-Parquet stores,
-  GRIB, HDF4/5 multidim — all readable via the GDAL drivers
+  rasterio re-exposes- Zarr v3, Icechunk, kerchunk-Parquet stores,
+  GRIB, HDF4/5 multidim- all readable via the GDAL drivers
 
 For a single GeoTIFF or a STAC item, rioxarray is usually a better fit.
 For multidim cloud-native datasets, virtualized Zarr/Icechunk stores, or
@@ -67,7 +67,7 @@ is a composition of these with GDAL virtual paths.
 
 For multispectral imagery, image stacks, and anything where bands are
 interchangeable axes. Produces a single `band_data` DataArray with
-dims `(band, y, x)` — the rioxarray-compatible layout.
+dims `(band, y, x)`- the rioxarray-compatible layout.
 
 ```python
 import xarray as xr
@@ -104,7 +104,7 @@ ds
 #     density      (y, x) float32
 ```
 
-### 3. Multidim — N-D arrays with named dimensions
+### 3. Multidim- N-D arrays with named dimensions
 
 For datasets with their own dimension/coordinate structure: HDF5,
 NetCDF, multidim VRT, GRIB, Zarr (v2 and v3). Produces a Dataset whose
@@ -121,14 +121,14 @@ ds["temperature"].sel(time="2024-06", level=500).isel(latitude=slice(100, 200))
 
 The three modes above combine with GDAL's virtualization layers to cover
 nearly every cloud-native and remote-data scenario. None of these
-require any code changes in `gdalxarray` — they're just different paths:
+require any code changes in `gdalxarray`- they're just different paths:
 
 | Prefix or syntax           | What it does                                              |
 |----------------------------|-----------------------------------------------------------|
 | `/vsicurl/<url>`           | HTTP/HTTPS-served files                                   |
 | `/vsis3/<bucket>/<key>`    | S3 (anonymous via `AWS_NO_SIGN_REQUEST=YES`)              |
 | `/vsigs/...`               | Google Cloud Storage                                      |
-| `vrt://<path>?<options>`   | Inline classic-raster VRT — subdataset selection, resampling, ... |
+| `vrt://<path>?<options>`   | Inline classic-raster VRT- subdataset selection, resampling, ... |
 | `NETCDF:<path>:<var>`      | Pick a subdataset from a NetCDF                           |
 | `ZARR:"<path>":/<array>`   | Open one array of a Zarr store as a classic raster        |
 | Classic VRT (`.vrt`)       | XML file referencing other sources                        |

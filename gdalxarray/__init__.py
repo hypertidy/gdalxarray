@@ -1,6 +1,6 @@
-"""gdalxarray — an xarray backend powered by GDAL."""
+"""gdalxarray - an xarray backend powered by GDAL."""
 
-# Friendly error when GDAL bindings are missing — gdalxarray cannot work without
+# Friendly error when GDAL bindings are missing - gdalxarray cannot work without
 # them and there is no fallback (osgeo.gdal has no PyPI wheels).
 try:
     from osgeo import gdal as _gdal  # noqa: F401  (used by .backend, re-exported for env check)

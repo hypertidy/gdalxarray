@@ -39,8 +39,8 @@ def foo5_vrt() -> str:
 def synthetic_geotiff(tmp_path_factory) -> str:
     """A small multiband GeoTIFF written once per session.
 
-    Three bands, distinct constant values, tiled with 32×32 blocks. Geotransform
-    has a negative y-step so latitude runs north-down — same orientation as the
+    Three bands, distinct constant values, tiled with 32x32 blocks. Geotransform
+    has a negative y-step so y values run north-down - same orientation as the
     bulk of real-world data, and exercises the reverse-slice fix on slices.
     """
     from osgeo import gdal
@@ -54,7 +54,7 @@ def synthetic_geotiff(tmp_path_factory) -> str:
         gdal.GDT_Float32,
         options=["TILED=YES", "BLOCKXSIZE=32", "BLOCKYSIZE=32"],
     )
-    # Origin upper-left, 0.1° per pixel, latitude decreasing
+    # Origin upper-left, 0.1 degree per pixel, y decreasing
     ds.SetGeoTransform([100.0, 0.1, 0.0, 30.0, 0.0, -0.1])
     ds.SetProjection("EPSG:4326")
     for i in range(3):

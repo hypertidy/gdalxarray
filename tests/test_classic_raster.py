@@ -119,13 +119,13 @@ def test_isel_x_y_lazy(backend, synthetic_geotiff):
 
 
 def test_sel_decreasing_lat(backend, synthetic_geotiff):
-    """Geotransform has negative y-step → latitude decreases.
+    """Geotransform has negative y-step -> y values decreasing.
 
-    A sel slice from a larger to a smaller latitude triggers the
+    A sel slice from a larger to a smaller y coordinate triggers the
     reverse-slice fix in GDALMultiBandArray._raw_indexing_method.
     """
     ds = backend.open_dataset(synthetic_geotiff, multidim=False)
-    # Top half of the raster (larger latitudes → smaller latitudes)
+    # Top half of the raster (larger y -> smaller y)
     sub = ds["band_data"].sel(y=slice(30.0, 22.0))
     arr = sub.values
     # Each band should still equal its constant value
@@ -138,7 +138,7 @@ def test_sel_decreasing_lat(backend, synthetic_geotiff):
 
 def test_crs_attached(backend, synthetic_geotiff):
     ds = backend.open_dataset(synthetic_geotiff, multidim=False)
-    # Either a CRSIndex coordinate, or proj-aware attrs — minimally there
+    # Either a CRSIndex coordinate, or proj-aware attrs - minimally there
     # must be SOMETHING describing CRS.
     has_crs = (
         "crs" in ds.coords
@@ -163,12 +163,12 @@ def test_subdataset_file_raises_helpful_error(backend, foo5_vrt):
     Three possible error paths, all acceptable:
 
     * GDAL itself refuses the file ("not recognized as being in a supported
-      file format") — this is the case for multidim-only formats like a
+      file format") - this is the case for multidim-only formats like a
       multidim VRT, where the classic driver can't open it at all.
     * The file opens but reports zero bands and subdataset entries, which
       gdalxarray catches and raises a ValueError listing the subdatasets
       and suggesting multidim=True.
-    * The file opens but has no bands and no subdatasets — a separate
+    * The file opens but has no bands and no subdatasets - a separate
       ValueError.
 
     What must NOT happen: the silent empty 512x512 stub Dataset.

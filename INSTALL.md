@@ -2,7 +2,7 @@
 
 `gdalxarray` is a pure-Python package and is installed with `pip`. It depends on
 the GDAL Python bindings (`osgeo.gdal`), which are **not** installable via pip
-alone — GDAL is a C++ library and its Python bindings need a matching system
+alone - GDAL is a C++ library and its Python bindings need a matching system
 library, development headers, and a compiler.
 
 This is the same situation faced by `osgeo.gdal` itself, `rasterio` (which
@@ -91,7 +91,7 @@ you need. The Zarr driver is included in the base.
 
 ## System package manager
 
-If your system has a recent enough GDAL (≥ 3.12), use the system package and
+If your system has a recent enough GDAL (>= 3.12), use the system package and
 install the Python bindings separately:
 
 ```bash
@@ -150,7 +150,7 @@ source checkout without `pip install`. Run `pip install -e .` from the repo
 root (for development) or `pip install gdalxarray` (for use).
 
 **GDAL version too old**
-Some `gdalxarray` features (notably `gdal mdim mosaic`) require GDAL ≥ 3.12.
+Some `gdalxarray` features (notably `gdal mdim mosaic`) require GDAL >= 3.12.
 Check with `python -c "from osgeo import gdal; print(gdal.__version__)"`.
 
 **numpy ABI mismatch**

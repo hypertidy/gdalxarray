@@ -35,7 +35,7 @@ def test_coordinates_present(backend, foo5_vrt):
 
 
 def test_y_is_decreasing(backend, foo5_vrt):
-    """Latitude coordinate decreases (40, -40) — the reverse-slice case."""
+    """Y coordinate decreases (40, -40) - the reverse-slice case."""
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     y = ds["y"].values
     assert y[0] > y[-1], f"expected decreasing y, got {y}"
@@ -43,7 +43,7 @@ def test_y_is_decreasing(backend, foo5_vrt):
 
 
 def test_time_decoded_to_datetime(backend, foo5_vrt):
-    """CF time units → datetime64 via decode_cf_datetime.
+    """CF time units -> datetime64 via decode_cf_datetime.
 
     The VRT uses a synthetic time array [0, 1, ..., 9] with unit
     'days since 2020-01-01', so the decoded values are deterministic.
@@ -94,7 +94,7 @@ def test_sel_decreasing_y(backend, foo5_vrt):
 
 
 def test_sel_reverse_slice(backend, foo5_vrt):
-    """sel(y=slice(40, -40)) on decreasing coord — the canonical repro."""
+    """sel(y=slice(40, -40)) on decreasing coord - the canonical repro."""
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     sub = ds["temperature"].sel(y=slice(40.0, -40.0))
     # Both rows included; shape on y axis is 2
@@ -118,14 +118,14 @@ def test_chunks_none_is_lazy_not_dask(backend, foo5_vrt):
     """chunks=None returns lazy but not Dask."""
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     assert not isinstance(ds["temperature"].data, da.Array)
-    # Still lazy — slicing must not materialise yet
+    # Still lazy - slicing must not materialise yet
     assert not isinstance(ds["temperature"].variable._data, np.ndarray)
 
 
 def test_provenance_in_encoding(backend, foo5_vrt):
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     assert ds.encoding.get("source") == foo5_vrt
-    # GDAL's driver name for multidim VRT — accept several possible spellings
+    # GDAL's driver name for multidim VRT - accept several possible spellings
     driver = ds.encoding.get("gdal_driver", "")
     assert "VRT" in driver, f"expected VRT in driver name, got {driver!r}"
 
@@ -134,7 +134,7 @@ def test_no_live_objects_in_encoding(backend, foo5_vrt):
     """ds.encoding should be serialization-safe (no live GDAL handles)."""
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     for key, val in ds.encoding.items():
-        # Strings, primitives, or None — never GDAL Python proxy objects
+        # Strings, primitives, or None - never GDAL Python proxy objects
         assert val is None or isinstance(val, (str, int, float, bool)), (
             f"encoding[{key!r}] is a {type(val).__name__}, not serialization-safe"
         )
