@@ -14,8 +14,8 @@ def _enable_gdal_exceptions():
     if not gdal.GetUseExceptions():
         gdal.UseExceptions()
 
-DATA_DIR = Path(__file__).parent / "data"
 
+DATA_DIR = Path(__file__).parent / "data"
 
 
 @pytest.fixture(scope="session")

@@ -38,7 +38,7 @@ def test_oisst_netcdf_over_vsicurl():
     assert "sst" in ds.data_vars or "time" in ds.coords
 
 
-#def test_aifs_icechunk_on_s3():
+# def test_aifs_icechunk_on_s3():
 #    """ECMWF AIFS forecast Icechunk store - confirms /vsiicechunk/ works."""
 #    os.environ.setdefault("AWS_REGION", "us-west-2")
 #    url = "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk"
@@ -47,8 +47,8 @@ def test_oisst_netcdf_over_vsicurl():
 #    assert "latitude" in ds.coords
 #    assert ds["latitude"].size == 721
 
-#import numpy as np
-#def test_aifs_lazy_isel():
+# import numpy as np
+# def test_aifs_lazy_isel():
 #    """One-element isel from AIFS should be tiny and fast."""
 #    os.environ.setdefault("AWS_REGION", "us-west-2")
 #    url = "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk"

@@ -193,7 +193,6 @@ def test_subdataset_file_raises_helpful_error(backend, foo5_vrt):
     ), f"unexpected error message: {excinfo.value!r}"
 
 
-
 def test_netcdf_classic_lists_subdatasets(backend):
     """Helpful-error branch: NetCDF with subdatasets gets a useful refusal."""
     nc_path = Path(__file__).parent / "data" / "foo_5dimensional.nc"
