@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Classic-raster open (`multidim=False`) on a file with no bands but
+  subdatasets now raises a `ValueError` listing the available
+  subdataset paths and pointing at `multidim=True`. Previously this
+  produced a confusing empty 512×512 stub Dataset. Mirrors what
+  `terra::rast()` does on the R side: shows the user the structure
+  they actually have and how to choose. (#issue-classic-raster-helpful)
+
 ## [0.3.0] - 2026-06-15
 
 ### Added

@@ -1,363 +1,191 @@
-
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
 # gdalxarray
 
 <!-- badges: start -->
-
+[![PyPI](https://img.shields.io/pypi/v/gdalxarray.svg)](https://pypi.org/project/gdalxarray/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 <!-- badges: end -->
 
-The goal of gdalxarray is to integrate GDAL with xarray, especially for
-the multidimensional API which is still relatively underutilized.
+An xarray backend powered directly by GDAL.
 
-## Requirements
-
-Users *must* install GDAL through their system package manager,
-conda-forge, or Docker before `pip install gdalxarray`. There are no
-wheels on PyPi for GDAL, so we can’t support binary installs. We will
-have installation recommendations and advisable pathways to use docker
-etc, and feel free to contact about options by creating issues.
-
-<https://github.com/hypertidy/gdalxarray/issues>
-
-## Todo
-
-- [x] apply xarray indexes when relevant in Raster
-- [ ] apply xarray indexes when relevant in Multidim
-- [ ] define stance on representation of “default transform”, and when
-  GCPs, RPCs, or geolocation arrays are present
-- [ ] explore when we need to control driver choice (netcdf and hdf in
-  particular)
-- [x] explore registering as an xarray backend, via
-  `engine = "gdalxarray"`
-
-Here’s a basic example:
-
-``` python
-from gdalxarray import GDALBackendEntrypoint
-backend = GDALBackendEntrypoint()
-dsn =  "/vsicurl/https://projects.pawsey.org.au/idea-sealevel-glo-phy-l4-nrt-008-046/data.marine.copernicus.eu/SEALEVEL_GLO_PHY_L4_NRT_008_046/cmems_obs-sl_glo_phy-ssh_nrt_allsat-l4-duacs-0.125deg_P1D_202506/2025/08/nrt_global_allsat_phy_l4_20250825_20250825.nc"
-ds = backend.open_dataset(f'vrt://{dsn}?sd_name=vgos', chunks = {}, multidim = False)
-ds1 = backend.open_dataset(dsn, multidim = True, chunks = {}) 
+```python
+import xarray as xr
+ds = xr.open_dataset(path_or_uri, engine="gdalxarray")
 ```
 
-We have a Raster xarray:
+`gdalxarray` is a thin bridge between GDAL's reading capabilities — classic
+raster, multidimensional, and any of the virtualized stores GDAL knows about —
+and xarray's labelled-array model. Lazy by default, optionally Dask-chunked,
+with native CRS and CF time handling.
 
-``` python
+## Installation
+
+GDAL has no usable PyPI wheels, so `pip install gdalxarray` alone is not
+enough. You need a working `osgeo.gdal` Python binding first. The
+recommended paths, in order of friction:
+
+- **conda-forge** (cross-platform, just works): `mamba install -c conda-forge gdal`
+- **Docker** image with GDAL preinstalled (e.g. `ghcr.io/hypertidy/gdal-r-python:latest`)
+- **System package manager** (apt, brew) plus matching system Python bindings
+
+Then `pip install gdalxarray` for the engine itself. See
+[**INSTALL.md**](INSTALL.md) for the full guide, including troubleshooting
+for NumPy ABI mismatches and Python version pinning.
+
+## Why this exists (vs rioxarray)
+
+[rioxarray](https://corteva.github.io/rioxarray/) is an xarray accessor
+and backend built on
+[rasterio](https://rasterio.readthedocs.io/), which wraps GDAL with its
+own Python conventions. For straightforward 2D/3D raster work it's the
+mature, widely-used choice — the `da.rio.reproject(...)` accessor pattern
+is well-known and well-tested.
+
+`gdalxarray` goes directly to `osgeo.gdal`, with no `rasterio` layer
+in between. That choice matters in a few specific cases:
+
+- **GDAL's multidimensional API is exposed natively** — N-D arrays
+  with named dimensions, not just (y, x) rasters with optional bands
+- **Any GDAL virtualization composes** — `/vsicurl/`, `/vsis3/`,
+  `vrt://`, `ZARR:`, `NETCDF:`, classic VRT, multidim VRT
+- **Codec and driver support tracks GDAL** rather than whatever
+  rasterio re-exposes — Zarr v3, Icechunk, kerchunk-Parquet stores,
+  GRIB, HDF4/5 multidim — all readable via the GDAL drivers
+
+For a single GeoTIFF or a STAC item, rioxarray is usually a better fit.
+For multidim cloud-native datasets, virtualized Zarr/Icechunk stores, or
+anything where you want GDAL itself to be the source of truth,
+`gdalxarray` puts you closer to the metal.
+
+## Three core usage modes
+
+The package has three ways to open a dataset, and almost everything else
+is a composition of these with GDAL virtual paths.
+
+### 1. Classic raster, bands as a dimension (default)
+
+For multispectral imagery, image stacks, and anything where bands are
+interchangeable axes. Produces a single `band_data` DataArray with
+dims `(band, y, x)` — the rioxarray-compatible layout.
+
+```python
+import xarray as xr
+
+ds = xr.open_dataset("image.tif", engine="gdalxarray", multidim=False)
+ds["band_data"]
+# <xarray.DataArray 'band_data' (band: 3, y: 1024, x: 1024)>
+#   ...
+
+# xarray idioms work as expected:
+mean_image = ds["band_data"].mean(dim="band")
+just_nir = ds["band_data"].sel(band=4)
+```
+
+### 2. Classic raster, bands as separate variables
+
+For multiband rasters where each band carries a semantically distinct
+quantity (e.g. a NetCDF translated to multiband GeoTIFF where bands are
+different physical variables). Each band becomes a separate data variable
+named after its description.
+
+```python
+ds = xr.open_dataset(
+    "multivariable.tif",
+    engine="gdalxarray",
+    multidim=False,
+    band_as_dim=False,
+)
 ds
-
-<xarray.Dataset> Size: 17MB
-Dimensions:  (x: 2880, y: 1440)
-Coordinates:
-  * x        (x) float64 23kB -180.0 -179.9 -179.8 -179.6 ... 179.6 179.8 179.9
-  * y        (y) float64 12kB 90.0 89.88 89.75 89.62 ... -89.62 -89.75 -89.88
-Data variables:
-    band_1   (y, x) int32 17MB dask.array<chunksize=(1440, 2880), meta=np.ndarray>
-Attributes:
-    crs:           GEOGCS["unknown",DATUM["unnamed",SPHEROID["Spheroid",63781...
-    geotransform:  (-180.0, 0.125, 0.0, 90.0, 0.0, -0.125)
+# <xarray.Dataset>
+# Data variables:
+#     temperature  (y, x) float32
+#     salinity     (y, x) float32
+#     density      (y, x) float32
 ```
 
-and a Multidim xarray:
+### 3. Multidim — N-D arrays with named dimensions
 
-``` python
-ds1
+For datasets with their own dimension/coordinate structure: HDF5,
+NetCDF, multidim VRT, GRIB, Zarr (v2 and v3). Produces a Dataset whose
+dims and coords come from the source.
 
-<xarray.Dataset> Size: 166MB
-Dimensions:    (latitude: 1440, nv: 2, longitude: 2880, time: 1)
-Coordinates:
-  * latitude   (latitude) float32 6kB -89.94 -89.81 -89.69 ... 89.69 89.81 89.94
-  * nv         (nv) int32 8B 0 1
-  * longitude  (longitude) float32 12kB -179.9 -179.8 -179.7 ... 179.8 179.9
-  * time       (time) float32 4B 2.763e+04
-Data variables:
-    lat_bnds   (latitude, nv) float32 12kB dask.array<chunksize=(1440, 2), meta=np.ndarray>
-    lon_bnds   (longitude, nv) float32 23kB dask.array<chunksize=(2880, 2), meta=np.ndarray>
-    sla        (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    err_sla    (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    ugosa      (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    err_ugosa  (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    vgosa      (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    err_vgosa  (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    adt        (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    ugos       (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    vgos       (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-    flag_ice   (time, latitude, longitude) int32 17MB dask.array<chunksize=(1, 1440, 2880), meta=np.ndarray>
-Attributes: (12/44)
-    Conventions:                     CF-1.6
-    Metadata_Conventions:            Unidata Dataset Discovery v1.0
-    cdm_data_type:                   Grid
-    comment:                         Sea Surface Height measured by Altimetry...
-    contact:                         servicedesk.cmems@mercator-ocean.eu
-    creator_email:                   servicedesk.cmems@mercator-ocean.eu
-    ...                              ...
-    summary:                         DUACS Near-Real-Time Level-4 sea surface...
-    time_coverage_duration:          P1D
-    time_coverage_end:               2025-08-25T12:00:00Z
-    time_coverage_resolution:        P1D
-    time_coverage_start:             2025-08-24T12:00:00Z
-    title:                           NRT merged all satellites Global Ocean G...
+```python
+ds = xr.open_dataset("dataset.nc", engine="gdalxarray", multidim=True)
+ds["temperature"].sel(time="2024-06", level=500).isel(latitude=slice(100, 200))
 ```
 
-There’s one variable called ‘band_1’ for the raster:
+`multidim=True` is the default for `engine="gdalxarray"`.
 
-``` python
-ds.band_1.isel(x = 0)
-# <xarray.DataArray 'band_1' (y: 1440)> Size: 6kB
-# dask.array<getitem, shape=(1440,), dtype=int32, chunksize=(1440,), chunktype=numpy.ndarray>
-# Coordinates:
-#     x        float64 8B -180.0
-#   * y        (y) float64 12kB 90.0 89.88 89.75 89.62 ... -89.62 -89.75 -89.88
-# Attributes:
-#     nodata:   -2147483647.0
-#     scale:    0.0001
-#     offset:   0.0
-```
+## Composing with GDAL virtual paths
 
-we can access actual values
+The three modes above combine with GDAL's virtualization layers to cover
+nearly every cloud-native and remote-data scenario. None of these
+require any code changes in `gdalxarray` — they're just different paths:
 
-``` python
-## the raw values for now
-ds.band_1.sel(x = 100, y = -50, method = "nearest").values
-#> array(441, dtype=int32)
+| Prefix or syntax           | What it does                                              |
+|----------------------------|-----------------------------------------------------------|
+| `/vsicurl/<url>`           | HTTP/HTTPS-served files                                   |
+| `/vsis3/<bucket>/<key>`    | S3 (anonymous via `AWS_NO_SIGN_REQUEST=YES`)              |
+| `/vsigs/...`               | Google Cloud Storage                                      |
+| `vrt://<path>?<options>`   | Inline classic-raster VRT — subdataset selection, resampling, ... |
+| `NETCDF:<path>:<var>`      | Pick a subdataset from a NetCDF                           |
+| `ZARR:"<path>":/<array>`   | Open one array of a Zarr store as a classic raster        |
+| Classic VRT (`.vrt`)       | XML file referencing other sources                        |
+| Multidim VRT (`.vrt`)      | N-D version, layered over NetCDF/HDF/Zarr sources         |
 
-ds1.sla.isel(longitude = 0, latitude = 1000).values
-#> array([2404], dtype=int32)
-```
+A few illustrative compositions:
 
-## Open ECMWF AIFS Single forecast (Icechunk on S3) with gdalxarray
-
-Note this requires the in-dev rouault/icechunk branch (as of
-2026-06-12).
-
-``` python
-import os
-os.environ["AWS_NO_SIGN_REQUEST"] =  "YES"
-os.environ["AWS_REGION"] =  "us-west-2"
-
-import gdalxarray
-from gdalxarray import GDALBackendEntrypoint
-
-backend = GDALBackendEntrypoint()
-xds = backend.open_dataset(
-    "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk",
-    multidim=True,
+```python
+# Public COG over HTTPS:
+xr.open_dataset(
+    "/vsicurl/https://example.com/data.tif",
+    engine="gdalxarray", multidim=False,
 )
 
-print(xds.encoding.get("gdal_dataset").GetDriver().GetDescription())
-# 'Icechunk'
+# All variables of a CMEMS NetCDF on S3:
+xr.open_dataset(
+    "NETCDF:/vsis3/bucket/path/file.nc",
+    engine="gdalxarray", multidim=True,
+)
 
-print(xds)
+# A multidim VRT as a labelled coordinate-aware view over a raw NetCDF:
+xr.open_dataset("study_area.vrt", engine="gdalxarray", multidim=True)
 ```
 
-    <xarray.Dataset> Size: 14TB
-    Dimensions:                                     (init_time: 3205,
-                                                     latitude: 721, lead_time: 61,
-                                                     longitude: 1440)
-    Coordinates:
-      * init_time                                   (init_time) datetime64[ns] 26kB ...
-      * latitude                                    (latitude) float64 6kB 90.0 ....
-      * lead_time                                   (lead_time) int64 488B 0 ... ...
-      * longitude                                   (longitude) float64 12kB -180...
-    Data variables: (12/21)
-        dew_point_temperature_2m                    (init_time, lead_time, latitude, longitude) float32 812GB ...
-        downward_long_wave_radiation_flux_surface   (init_time, lead_time, latitude, longitude) float32 812GB ...
-        downward_short_wave_radiation_flux_surface  (init_time, lead_time, latitude, longitude) float32 812GB ...
-        expected_forecast_length                    (init_time) float32 13kB ...
-        geopotential_height_500hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
-        geopotential_height_850hpa                  (init_time, lead_time, latitude, longitude) float32 812GB ...
-        ...                                          ...
-        total_cloud_cover_atmosphere                (init_time, lead_time, latitude, longitude) float32 812GB ...
-        valid_time                                  (init_time, lead_time) float32 782kB ...
-        wind_u_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
-        wind_u_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
-        wind_v_100m                                 (init_time, lead_time, latitude, longitude) float32 812GB ...
-        wind_v_10m                                  (init_time, lead_time, latitude, longitude) float32 812GB ...
-    Attributes:
-        attribution:          ECMWF AIFS Single forecast data processed by dynami...
-        dataset_id:           ecmwf-aifs-single-forecast
-        dataset_version:      0.1.0
-        description:          Weather forecasts from the ECMWF Artificial Intelli...
-        forecast_domain:      Forecast lead time 0-360 hours (0-15 days) ahead
-        forecast_resolution:  6 hourly
-        license:              CC-BY-4.0
-        name:                 ECMWF AIFS Single forecast
-        spatial_domain:       Global
-        spatial_resolution:   0.25 degrees (~20km)
-        time_domain:          Forecasts initialized 2024-04-01 00:00:00 UTC to Pr...
-        time_resolution:      Forecasts initialized every 6 hours
+## Which mode for which format?
 
-## ZARR from CMEMS
+As a rough guide, `multidim=True` is the natural fit for formats whose
+own data model is N-dimensional with named axes:
 
-``` python
-from gdalxarray import GDALBackendEntrypoint
-dsn = 'ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-045/arco/SEALEVEL_GLO_PHY_L4_MY_008_047/cmems_obs-sl_glo_phy-ssh_my_allsat-l4-duacs-0.125deg_P1D_202411/timeChunked.zarr"'
-backend = GDALBackendEntrypoint()
-#ds = backend.open_dataset(filename_or_obj, multidim = True, chunks = None)
-ds = backend.open_dataset(dsn, multidim = True, chunks = {})
-ds
+- NetCDF (3 and 4)
+- HDF5 / HDF4
+- Multidim VRT
+- GRIB / GRIB2
+- Zarr (v2 and v3)
+- Icechunk (where supported by your GDAL build)
 
-# <xarray.Dataset> Size: 2TB
-# Dimensions:         (latitude: 1440, longitude: 2880, time: 11902, nv: 2)
-# Coordinates:
-#   * latitude        (latitude) float32 6kB -89.94 -89.81 -89.69 ... 89.81 89.94
-#   * longitude       (longitude) float32 12kB -179.9 -179.8 ... 179.8 179.9
-#   * time            (time) float32 48kB 1.571e+04 1.571e+04 ... 2.761e+04
-#   * nv              (nv) int32 8B 0 1
-# Data variables: (12/13)
-#     adt             (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     err_sla         (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     err_ugosa       (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     err_vgosa       (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     flag_ice        (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     lat_bnds        (latitude, nv) float32 12kB dask.array<chunksize=(1440, 2), meta=np.ndarray>
-#     ...              ...
-#     sla             (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     tpa_correction  (time) int32 48kB dask.array<chunksize=(1,), meta=np.ndarray>
-#     ugos            (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     ugosa           (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     vgos            (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-#     vgosa           (time, latitude, longitude) int32 197GB dask.array<chunksize=(1, 512, 1024), meta=np.ndarray>
-# Attributes: (12/43)
-#     Conventions:                     CF-1.6
-#     Metadata_Conventions:            Unidata Dataset Discovery v1.0
-#     cdm_data_type:                   Grid
-#     comment:                         Sea Surface Height measured by Altimetry...
-#     contact:                         servicedesk.cmems@mercator-ocean.eu
-#     coordinates:                     lat_bnds lon_bnds
-#     ...                              ...
-#     summary:                         SSALTO/DUACS Delayed-Time Level-4 sea su...
-#     time_coverage_duration:          P1D
-#     time_coverage_end:               2023-12-31T12:00:00Z
-#     time_coverage_resolution:        P1D
-#     time_coverage_start:             2023-12-30T12:00:00Z
-#     title:                           DT merged all satellites Global Ocean Gr...
-```
+`multidim=False` is the natural fit for image-like formats:
 
-This example is a virtualized mosaic of NetCDF in multidim VRT.
+- GeoTIFF (including COG)
+- JPEG, PNG, JPEG2000
+- ERDAS Imagine (.img)
+- Classic VRT files
+- Anything GDAL identifies as a 2D-with-bands raster
 
-``` python
-big_virtual_mdim = "/vsicurl/https://gist.githubusercontent.com/mdsumner/18c5d302d00b9a456bb73d30ac758764/raw/f26e1b2e202f759d6aace4d7deb3e04ea3c85f15/mdim.vrt"
 
-bvm = backend.open_dataset(big_virtual_mdim, multidim = True, chunks = {})
-# <xarray.Dataset> Size: 3TB
-# Dimensions:   (Time: 5479, st_ocean: 51, yt_ocean: 1500, xt_ocean: 3600)
-# Coordinates:
-#   * Time      (Time) float64 44kB 1.132e+04 1.132e+04 ... 1.68e+04 1.68e+04
-#   * st_ocean  (st_ocean) float64 408B 2.5 7.5 12.5 ... 3.603e+03 4.509e+03
-#   * yt_ocean  (yt_ocean) float64 12kB -74.95 -74.85 -74.75 ... 74.75 74.85 74.95
-#   * xt_ocean  (xt_ocean) float64 29kB 0.05 0.15 0.25 0.35 ... 359.8 359.9 360.0
-# Data variables:
-#     temp      (Time, st_ocean, yt_ocean, xt_ocean) int16 3TB dask.array<chunksize=(5479, 51, 1500, 3600), meta=np.ndarray>
-    
+## Status
 
-bvm.sel(xt_ocean = slice(140, 150), yt_ocean = slice(-55, -45), st_ocean = slice(8, 13)).isel(Time = -1).temp.values
+Active development. The API has settled but small changes are
+possible before 1.0. See [`CHANGELOG.md`](CHANGELOG.md) for what's
+landed and the [issue tracker](https://github.com/hypertidy/gdalxarray/issues)
+for what's next.
 
-# array([[[-30770, -30784, -30799, ..., -30418, -30424, -30445],
-#         [-30755, -30771, -30788, ..., -30418, -30425, -30446],
-#         [-30744, -30764, -30788, ..., -30417, -30426, -30448],
-#         ...,
-#         [-29852, -29868, -29889, ..., -29413, -29338, -29325],
-#         [-29835, -29851, -29883, ..., -29385, -29327, -29324],
-#         [-29821, -29840, -29879, ..., -29353, -29319, -29322]]],
-#       shape=(1, 100, 100), dtype=int16)
-```
+For worked examples against real cloud-native data
+(BRAN2023 ocean reanalysis, ECMWF AIFS forecasts, CMEMS sea level,
+NOAA OISST), see [`docs/cookbook.md`](docs/cookbook.md).
 
-### A grib example
 
-What a joy to simply be able to use GDAL for what it is good at without
-intermediate layers.
+## License
 
-``` python
-from gdalxarray import GDALBackendEntrypoint
-backend = GDALBackendEntrypoint()
-backend.open_dataset("/vsicurl/https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20251031/16/core/blend.t16z.core.f260.co.grib2", multidim = False, chunks = None)
-```
-
-    <xarray.Dataset> Size: 989MB
-    Dimensions:                                                                           (
-                                                                                           y: 1597,
-                                                                                           x: 2345)
-    Coordinates:
-      * x                                                                                 (x) float64 19kB ...
-      * y                                                                                 (y) float64 13kB ...
-      * crs                                                                               int64 8B ...
-    Data variables: (12/33)
-        APTMP:2 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        CAPE:surface:260 hour fcst                                                        (y, x) float64 30MB ...
-        CWASP:surface:260 hour fcst                                                       (y, x) float64 30MB ...
-        DPT:2 m above ground:260 hour fcst                                                (y, x) float64 30MB ...
-        DSWRF:surface:260 hour fcst                                                       (y, x) float64 30MB ...
-        FICEAC:surface:254-260 hour acc fcst                                              (y, x) float64 30MB ...
-        ...                                                                                ...
-        WDIR:80 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        WDIR:10 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        GUST:10 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        WIND:30 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        WIND:80 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-        WIND:10 m above ground:260 hour fcst                                              (y, x) float64 30MB ...
-    Indexes:
-      ┌ x        RasterIndex
-      └ y
-        crs      CRSIndex (crs=PROJCS["unnamed",GEOGCS["Coordinate System imported from GRIB file" ...)
-
-## Run in docker
-
-We have a pre-defined docker image that is ready to build/install
-gdalxarray.
-
-``` bash
-docker run --rm -it ghcr.io/hypertidy/gdal-r-python:latest bash
-# inside the container:
-pip install gdalxarray   # (once on PyPI)
-# or for development:
-pip install -e /path/to/gdalxarray
-```
-
-(Add `--security-opt seccomp=unconfined` to docker run if you need
-remote NetCDF).
-
-There’s a lot more to do, scaling works but I turned that off to test
-for now. .
-
-Template a list of netcdf files and mosaic them to VRT, then open with
-this xarray backend. (Note this requires GDAL\>=3.12.0 ).
-
-``` python
-month = "202501"
-url = [f"/vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/{month}/oisst-avhrr-v02r01.{month}{(day+1):02d}.nc" for day in range(31)]
-gdal.Run("mdim mosaic", input = url, output =  "oisst.vrt", array = "sst")
-from gdalxarray import GDALBackendEntrypoint
-backend = GDALBackendEntrypoint()
-
-backend.open_dataset("oisst.vrt", multidim = True)
-
-# <xarray.Dataset> Size: 64MB
-# Dimensions:  (lat: 720, lon: 1440, time: 31, zlev: 1)
-# Coordinates:
-#   * lat      (lat) float64 6kB -89.88 -89.62 -89.38 -89.12 ... 89.38 89.62 89.88
-#   * lon      (lon) float64 12kB 0.125 0.375 0.625 0.875 ... 359.4 359.6 359.9
-#   * time     (time) float64 248B 1.717e+04 1.72e+04 ... 1.717e+04 1.717e+04
-#   * zlev     (zlev) float64 8B 0.0
-# Data variables:
-#     sst      (time, zlev, lat, lon) int16 64MB ...
-# 
-```
-
-## Debugging
-
-Debug messages are sprinkled here and there, we might do more work to be
-more systematic here.
-
-``` python
-import logging
-logging.basicConfig()                                    # installs root handler at WARNING
-logging.getLogger("gdalxarray").setLevel(logging.DEBUG)  # let gdalxarray's DEBUG through
-```
-
-## Code of Conduct
-
-Please note that the gdalxarray project is released with a [Contributor
-Code of
-Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html).
-By contributing to this project, you agree to abide by its terms.
+Apache-2.0.
