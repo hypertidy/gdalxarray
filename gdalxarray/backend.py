@@ -59,8 +59,8 @@ class GDALBackendArray(BackendArray):
         return self._local.band
     
     def __dask_tokenize__(self):
-        # Fast unique identifier - avoids Dask trying to hash the mdarray
-        return (type(self).__name__, id(self.dataset), self.band_index)
+        # Fast unique identifier
+        return (type(self).__name__, self.filename, self.band_index)
     
     @staticmethod
     def _gdal_to_numpy_dtype(gdal_dtype):
@@ -182,6 +182,181 @@ class GDALBackendArray(BackendArray):
           return data[:, 0]
       else:
           return data
+
+
+class GDALMultiBandArray(BackendArray):
+    """Wrapper exposing all bands of a GDAL dataset as a single 3D (band, y, x) array.
+    
+    Used by _open_raster when band_as_dim=True (the default), so that bands behave
+    as an xarray dimension rather than separate data variables. Read efficiency is
+    typically better than per-band reads because GDAL handles BIP/BIL/BSQ interleaving
+    internally — multi-band selections on interleaved imagery only touch the source
+    once per (y, x) window.
+    """
+    
+    def __init__(self, filename, band_indices=None):
+        self.filename = filename
+        self._local = threading.local()
+        logger.debug("multiband filename: %s", filename)
+        
+        ds = gdal.Open(filename, gdal.GA_ReadOnly)
+        if ds is None:
+            raise ValueError(f"Could not open {filename}")
+        
+        num_bands = ds.RasterCount
+        if band_indices is None:
+            band_indices = list(range(1, num_bands + 1))
+        self.band_indices = list(band_indices)
+        
+        # Assume all bands share dtype and y/x shape (the GDAL convention)
+        band1 = ds.GetRasterBand(self.band_indices[0])
+        self._shape = (len(self.band_indices), ds.RasterYSize, ds.RasterXSize)
+        self._dtype = GDALBackendArray._gdal_to_numpy_dtype(band1.DataType)
+        self._block_size = band1.GetBlockSize()  # [x, y]
+        ds = None
+    
+    def _get_dataset(self):
+        if not hasattr(self._local, 'ds'):
+            self._local.ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
+        return self._local.ds
+    
+    def __dask_tokenize__(self):
+        return (type(self).__name__, self.filename, tuple(self.band_indices))
+    
+    @property
+    def shape(self):
+        return self._shape
+    
+    @property
+    def dtype(self):
+        return np.dtype(self._dtype)
+    
+    @property
+    def ndim(self):
+        return 3
+    
+    @property
+    def size(self):
+        return int(np.prod(self._shape))
+    
+    def __getitem__(self, key):
+        logger.debug("multiband __getitem__ key type=%s key=%r",
+                     type(key).__name__, key)
+        
+        from xarray.core import indexing as xr_indexing
+        if isinstance(key, xr_indexing.BasicIndexer):
+            key = key.tuple
+        elif isinstance(key, xr_indexing.OuterIndexer):
+            key = key.tuple
+        elif isinstance(key, xr_indexing.VectorizedIndexer):
+            key = key.tuple
+        
+        if isinstance(key, tuple):
+            return self._raw_indexing_method(key)
+        else:
+            return self._raw_indexing_method((key,))
+    
+    def _raw_indexing_method(self, key):
+        """Read data from GDAL via dataset.ReadAsArray with a band_list."""
+        # Pad key with full slices if needed
+        if len(key) < 3:
+            key = key + (slice(None),) * (3 - len(key))
+        if len(key) > 3:
+            raise IndexError(f"Expected at most 3D index, got {len(key)}D")
+        
+        b_idx, y_idx, x_idx = key
+        squeeze_b = squeeze_y = squeeze_x = False
+        
+        # Resolve band indexer to a list of 1-based GDAL band numbers.
+        if isinstance(b_idx, (int, np.integer)):
+            band_list = [self.band_indices[int(b_idx)]]
+            squeeze_b = True
+        elif isinstance(b_idx, slice):
+            b_start = b_idx.start if b_idx.start is not None else 0
+            b_stop = b_idx.stop if b_idx.stop is not None else self._shape[0]
+            b_step = b_idx.step if b_idx.step is not None else 1
+            if b_step > 0 and b_stop < b_start:
+                b_start, b_stop = b_stop, b_start + 1
+            elif b_step < 0:
+                b_start, b_stop, b_step = b_stop + 1, b_start + 1, -b_step
+            band_list = [self.band_indices[i]
+                         for i in range(b_start, b_stop, b_step)]
+        elif isinstance(b_idx, (list, np.ndarray)):
+            band_list = [self.band_indices[int(i)] for i in b_idx]
+        else:
+            raise IndexError(f"Unsupported band index type: {type(b_idx)}")
+        
+        # Resolve y indexer
+        if isinstance(y_idx, (int, np.integer)):
+            y_start, y_size = int(y_idx), 1
+            squeeze_y = True
+        elif isinstance(y_idx, slice):
+            y_start = y_idx.start if y_idx.start is not None else 0
+            y_stop = y_idx.stop if y_idx.stop is not None else self._shape[1]
+            y_step = y_idx.step if y_idx.step is not None else 1
+            if y_step > 0 and y_stop < y_start:
+                y_start, y_stop = y_stop, y_start + 1
+            elif y_step < 0:
+                y_start, y_stop, y_step = y_stop + 1, y_start + 1, -y_step
+            y_size = y_stop - y_start
+        else:
+            raise IndexError(f"Unsupported y index type: {type(y_idx)}")
+        
+        # Resolve x indexer
+        if isinstance(x_idx, (int, np.integer)):
+            x_start, x_size = int(x_idx), 1
+            squeeze_x = True
+        elif isinstance(x_idx, slice):
+            x_start = x_idx.start if x_idx.start is not None else 0
+            x_stop = x_idx.stop if x_idx.stop is not None else self._shape[2]
+            x_step = x_idx.step if x_idx.step is not None else 1
+            if x_step > 0 and x_stop < x_start:
+                x_start, x_stop = x_stop, x_start + 1
+            elif x_step < 0:
+                x_start, x_stop, x_step = x_stop + 1, x_start + 1, -x_step
+            x_size = x_stop - x_start
+        else:
+            raise IndexError(f"Unsupported x index type: {type(x_idx)}")
+        
+        # Handle zero-sized slices (Dask uses these for _meta)
+        if y_size == 0 or x_size == 0 or len(band_list) == 0:
+            shape = []
+            if not squeeze_b:
+                shape.append(len(band_list))
+            if not squeeze_y:
+                shape.append(y_size)
+            if not squeeze_x:
+                shape.append(x_size)
+            return np.empty(shape, dtype=self._dtype)
+        
+        ds = self._get_dataset()
+        logger.debug("multiband read: bands=%s yoff=%s xoff=%s ysize=%s xsize=%s",
+                     band_list, y_start, x_start, y_size, x_size)
+        
+        data = ds.ReadAsArray(
+            xoff=x_start,
+            yoff=y_start,
+            xsize=x_size,
+            ysize=y_size,
+            band_list=band_list,
+        )
+        
+        # ReadAsArray returns 2D for a single band, 3D for multiple - normalise.
+        if data.ndim == 2:
+            data = data[np.newaxis, :, :]
+        
+        # Squeeze integer-indexed dims; do it in one pass to keep axis numbering sane.
+        axes_to_squeeze = []
+        if squeeze_b:
+            axes_to_squeeze.append(0)
+        if squeeze_y:
+            axes_to_squeeze.append(1)
+        if squeeze_x:
+            axes_to_squeeze.append(2)
+        if axes_to_squeeze:
+            data = np.squeeze(data, axis=tuple(axes_to_squeeze))
+        
+        return data
 
 
 class GDALMultiDimArray(BackendArray):
@@ -323,6 +498,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         chunks: dict[Hashable, int] | None = None,
         multidim: bool = True,
         group: str | None = None,
+        band_as_dim: bool = True,
     ) -> xr.Dataset:
         """
         Open a dataset using GDAL.
@@ -334,45 +510,160 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         drop_variables : list, optional
             Variables to drop from the dataset
         chunks : dict, optional
-            Chunk sizes for Dask arrays
-        multidim : bool, default False
-            If True, use GDAL multidimensional API (OpenEx with OF_MULTIDIM_RASTER)
-            If False, use standard raster API
+            Chunk sizes for Dask arrays. None (default) returns a lazy
+            non-Dask Dataset; ``{}`` uses GDAL's native block sizes;
+            an explicit mapping (e.g. ``{"y": 256, "x": 256}``) is honoured.
+        multidim : bool, default True
+            If True, use GDAL's multidimensional API (OpenEx with OF_MULTIDIM_RASTER).
+            If False, use the classic raster API.
         group : str, optional
-            Group path for multidimensional datasets (e.g., "/group/subgroup")
-        **kwargs
-            Additional backend-specific options
+            Group path for multidimensional datasets (e.g., "/group/subgroup").
+        band_as_dim : bool, default True
+            Classic-raster only. If True, bands become an xarray "band" dimension
+            on a single ``band_data`` DataArray (the rioxarray-compatible idiom).
+            If False, each band becomes a separate data variable named after its
+            description (or ``band_N``). The True default suits multispectral
+            imagery; False is preferable when bands carry semantically distinct
+            quantities (e.g. NetCDF-translated multivariable rasters).
         """
         
         if multidim:
             return self._open_multidim(filename_or_obj, chunks, group, drop_variables)
         else:
-            return self._open_raster(filename_or_obj, chunks, drop_variables)
+            return self._open_raster(
+                filename_or_obj, chunks, drop_variables, band_as_dim=band_as_dim
+            )
     
-    def _open_raster(self, filename_or_obj, chunks, drop_variables):
-        """Open using standard GDAL raster API."""
+    def _open_raster(self, filename_or_obj, chunks, drop_variables, band_as_dim=True):
+        """Open using GDAL's classic raster API."""
         logger.debug("filename_or_obj: %s", filename_or_obj)
-        # Open with GDAL
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
         if dataset is None:
             raise ValueError(f"Could not open {filename_or_obj} with GDAL")
         
-        # Get geotransform for coordinates
+        # Shared setup: geotransform → RasterIndex, projection, band count.
         geotransform = dataset.GetGeoTransform()
-        
-        # Calculate coordinates
-        #x_coords = np.arange(dataset.RasterXSize) * geotransform[1] + geotransform[0]
-        #y_coords = np.arange(dataset.RasterYSize) * geotransform[5] + geotransform[3]
-        index = RasterIndex.from_transform(Affine.from_gdal(geotransform[0], geotransform[1], geotransform[2], 
-                                                            geotransform[3], geotransform[4], geotransform[5]), 
-                                                            width=dataset.RasterXSize, height=dataset.RasterYSize)
-
-        # Get CRS
+        index = RasterIndex.from_transform(
+            Affine.from_gdal(*geotransform),
+            width=dataset.RasterXSize,
+            height=dataset.RasterYSize,
+        )
         projection = dataset.GetProjection()
-        
-        # Create data variables for each band
-        data_vars = {}
         num_bands = dataset.RasterCount
+        
+        if band_as_dim:
+            ds = self._raster_as_band_dim(
+                filename_or_obj, dataset, chunks, drop_variables, num_bands
+            )
+        else:
+            ds = self._raster_as_vars(
+                filename_or_obj, dataset, chunks, drop_variables, num_bands
+            )
+        
+        # Apply spatial coordinates and CRS uniformly to both layouts.
+        ds = ds.assign_coords(xr.Coordinates.from_xindex(index))
+        if len(projection) > 0:
+            ds = ds.proj.assign_crs(crs=projection)
+        return ds
+    
+    def _raster_as_band_dim(
+        self, filename_or_obj, dataset, chunks, drop_variables, num_bands
+    ):
+        """Build a Dataset with bands collapsed into a 'band' dimension.
+        
+        Returns a single ``band_data`` DataArray with dims (band, y, x). Per-band
+        metadata (description, nodata, scale, offset) is attached as coordinate
+        variables along the band axis when it varies, or as scalar attrs when
+        it's uniform across bands.
+        """
+        # Gather per-band metadata up-front.
+        band_indices = list(range(1, num_bands + 1))
+        descriptions = []
+        nodatas = []
+        scales = []
+        offsets = []
+        for band_idx in band_indices:
+            band = dataset.GetRasterBand(band_idx)
+            descriptions.append(band.GetDescription() or f"band_{band_idx}")
+            nodatas.append(band.GetNoDataValue())
+            scales.append(band.GetScale() if band.GetScale() is not None else 1.0)
+            offsets.append(band.GetOffset() if band.GetOffset() is not None else 0.0)
+        
+        backend_array = GDALMultiBandArray(filename_or_obj, band_indices)
+        
+        if chunks is not None:
+            if chunks == {}:
+                block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
+                y_chunk = block_size[1] if block_size[1] > 0 else dataset.RasterYSize
+                x_chunk = block_size[0] if block_size[0] > 0 else dataset.RasterXSize
+                chunk_tuple = (1, y_chunk, x_chunk)
+                logger.debug("multiband chunks (band, y, x)=%s", chunk_tuple)
+            else:
+                chunk_tuple = (
+                    chunks.get("band", 1),
+                    chunks.get("y", -1),
+                    chunks.get("x", -1),
+                )
+            data = da.from_array(
+                backend_array,
+                chunks=chunk_tuple,
+                name=f"gdal-multiband-{filename_or_obj}",
+                asarray=False,
+            )
+        else:
+            data = indexing.LazilyIndexedArray(backend_array)
+        
+        # Decide whether per-band metadata is uniform (→ scalar attr) or varies
+        # (→ coordinate along the band axis). Descriptions are always per-band
+        # since they're meant to label individual bands.
+        attrs = {"descriptions": descriptions}
+        coords = {"band": np.array(band_indices)}
+        
+        nodatas_set = set(n for n in nodatas if n is not None)
+        if len(nodatas_set) == 1 and all(n is not None for n in nodatas):
+            attrs["nodata"] = nodatas[0]
+        elif any(n is not None for n in nodatas):
+            coords["nodata"] = (
+                "band",
+                np.array([n if n is not None else np.nan for n in nodatas]),
+            )
+        
+        if all(s == 1.0 for s in scales):
+            pass  # default, omit
+        elif len(set(scales)) == 1:
+            attrs["scale"] = scales[0]
+        else:
+            coords["scale"] = ("band", np.array(scales))
+        
+        if all(o == 0.0 for o in offsets):
+            pass  # default, omit
+        elif len(set(offsets)) == 1:
+            attrs["offset"] = offsets[0]
+        else:
+            coords["offset"] = ("band", np.array(offsets))
+        
+        da_obj = xr.DataArray(
+            data,
+            dims=["band", "y", "x"],
+            coords=coords,
+            attrs=attrs,
+            name="band_data",
+        )
+        
+        if drop_variables and "band_data" in drop_variables:
+            return xr.Dataset()
+        return xr.Dataset({"band_data": da_obj})
+    
+    def _raster_as_vars(
+        self, filename_or_obj, dataset, chunks, drop_variables, num_bands
+    ):
+        """Build a Dataset with each band as a separate (y, x) data variable.
+        
+        Use this when bands carry semantically distinct quantities (e.g. a
+        NetCDF translated to multiband GeoTIFF where bands are different
+        physical variables).
+        """
+        data_vars = {}
         
         for band_idx in range(1, num_bands + 1):
             band = dataset.GetRasterBand(band_idx)
@@ -381,65 +672,39 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             if drop_variables and band_name in drop_variables:
                 continue
             
-            # Create backend array
             backend_array = GDALBackendArray(filename_or_obj, band_idx)
             logger.debug("band: %i", band_idx)
-            # Wrap with Dask if chunks specified
+            
             if chunks is not None:
                 if chunks == {}:
-                    # FIXME what if no  bands available
-                    # Use native block sizes from GDAL
                     block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
-                    # Flip for (y, x) array order:
-                    chunk_tuple = (block_size[1], block_size[0]) 
-                    block_size = dataset.GetRasterBand(1).GetBlockSize()
-                    dim_sizes = [dataset.RasterXSize, dataset.RasterYSize]
-                    # block_size is (xsize, ysize) from GDAL; flip to match ["y", "x"] order
-                    chunk_tuple = (
-                       block_size[1] if block_size[1] > 0 else dim_sizes[0],
-                       block_size[0] if block_size[0] > 0 else dim_sizes[1],)
-                    logger.debug("shape=%s(x,y), chunks=%s(y,x)", dim_sizes, block_size)
+                    y_chunk = block_size[1] if block_size[1] > 0 else dataset.RasterYSize
+                    x_chunk = block_size[0] if block_size[0] > 0 else dataset.RasterXSize
+                    chunk_tuple = (y_chunk, x_chunk)
+                    logger.debug("shape=(y,x), chunks=(y,x)=%s", chunk_tuple)
                 else:
-                    chunk_tuple = (
-                       chunks.get("y", -1), chunks.get("x", -1),)
-                dask_array = da.from_array(
+                    chunk_tuple = (chunks.get("y", -1), chunks.get("x", -1))
+                data = da.from_array(
                     backend_array,
                     chunks=chunk_tuple,
                     name=f"gdal-{filename_or_obj}-{band_name}",
-                    asarray=False
+                    asarray=False,
                 )
-                data = dask_array
             else:
-                from xarray.core import indexing
                 data = indexing.LazilyIndexedArray(backend_array)
-
-
-            # Get band metadata
+            
             band_attrs = {
-                'nodata': band.GetNoDataValue(),
-                'scale': band.GetScale() or 1.0,
-                'offset': band.GetOffset() or 0.0,
+                "nodata": band.GetNoDataValue(),
+                "scale": band.GetScale() or 1.0,
+                "offset": band.GetOffset() or 0.0,
             }
             band_attrs = {k: v for k, v in band_attrs.items() if v is not None}
             
-            # Create DataArray
             data_vars[band_name] = xr.DataArray(
-                data,
-                dims=["y", "x"],
-                attrs=band_attrs
+                data, dims=["y", "x"], attrs=band_attrs
             )
-        # Create dataset
-        ds = xr.Dataset(data_vars)
-        ##https://gist.github.com/mdsumner/911c181467abb2c91d08544a94d8510a
-        ds = ds.assign_coords(xr.Coordinates.from_xindex(index))
-          
-        # https://xarray.dev/blog/flexible-indexing#xprojcrsindex
-        if len(projection) > 0: 
-          ds = ds.proj.assign_crs(crs = projection)
-        # Add global attributes
-        #ds.attrs['crs'] = projection
-        #ds.attrs['geotransform'] = geotransform
-        return ds
+        
+        return xr.Dataset(data_vars)
     
     def _open_multidim(self, filename_or_obj, chunks, group, drop_variables):
         """Open using GDAL multidimensional API."""
