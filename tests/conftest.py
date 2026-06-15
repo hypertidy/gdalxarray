@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from osgeo import gdal
 
+
 @pytest.fixture(autouse=True, scope="session")
 def _enable_gdal_exceptions():
     if not gdal.GetUseExceptions():

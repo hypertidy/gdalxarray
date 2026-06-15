@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 
-import numpy as np
 import pytest
 import xarray as xr
 
@@ -48,7 +47,7 @@ def test_oisst_netcdf_over_vsicurl():
 #    assert "latitude" in ds.coords
 #    assert ds["latitude"].size == 721
 
-
+#import numpy as np
 #def test_aifs_lazy_isel():
 #    """One-element isel from AIFS should be tiny and fast."""
 #    os.environ.setdefault("AWS_REGION", "us-west-2")

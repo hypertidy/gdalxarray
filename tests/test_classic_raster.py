@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import dask.array as da
 import numpy as np
 import pytest
-from pathlib import Path
+
 from gdalxarray import GDALBackendEntrypoint
 
 
