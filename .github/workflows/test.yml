@@ -37,6 +37,7 @@ jobs:
           create-args: >-
             python=${{ matrix.python-version }}
             gdal
+            libgdal-netcdf
             numpy
             xarray
             dask
