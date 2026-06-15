@@ -1,0 +1,71 @@
+<VRTDataset>
+  <Group name="/">
+    <Dimension name="station" size="10" indexingVariable="station" />
+    <Dimension name="time" size="10" indexingVariable="time" />
+    <Dimension name="x" size="2" indexingVariable="x" />
+    <Dimension name="y" size="2" indexingVariable="y" />
+    <Dimension name="z" size="2" indexingVariable="z" />
+
+    <Array name="time">
+      <DataType>Int32</DataType>
+      <DimensionRef ref="time" />
+      <Unit>days since 2020-01-01</Unit>
+      <RegularlySpacedValues start="0.0" increment="1.0" />
+    </Array>
+
+    <Array name="x">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="x" />
+      <Unit>degrees_east</Unit>
+      <RegularlySpacedValues start="100.0" increment="1.0" />
+    </Array>
+
+    <Array name="y">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="y" />
+      <Unit>degrees_north</Unit>
+      <RegularlySpacedValues start="40.0" increment="-80.0" />
+    </Array>
+
+    <Array name="z">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="z" />
+      <Unit>m</Unit>
+      <RegularlySpacedValues start="0.0" increment="100.0" />
+    </Array>
+
+    <Array name="station">
+      <DataType>Int32</DataType>
+      <DimensionRef ref="station" />
+      <RegularlySpacedValues start="1.0" increment="1.0" />
+    </Array>
+
+    <Array name="temperature">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="x" />
+      <DimensionRef ref="y" />
+      <DimensionRef ref="z" />
+      <DimensionRef ref="time" />
+      <DimensionRef ref="station" />
+      <Unit>degree_Celsius</Unit>
+      <Source>
+        <SourceFilename relativeToVRT="1">foo_5dimensional.nc</SourceFilename>
+        <SourceArray>/temperature</SourceArray>
+        <SourceSlab offset="0,0,0,0,0" count="2,2,2,10,10" step="1,1,1,1,1" />
+        <DestSlab offset="0,0,0,0,0" />
+      </Source>
+    </Array>
+
+    <Array name="xx">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="time" />
+      <DimensionRef ref="station" />
+      <Source>
+        <SourceFilename relativeToVRT="1">foo_5dimensional.nc</SourceFilename>
+        <SourceArray>/xx</SourceArray>
+        <SourceSlab offset="0,0" count="10,10" step="1,1" />
+        <DestSlab offset="0,0" />
+      </Source>
+    </Array>
+  </Group>
+</VRTDataset>

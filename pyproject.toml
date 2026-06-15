@@ -52,6 +52,18 @@ dependencies = [
     # GDAL must be installed separately; see INSTALL.md
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.7", "pre-commit", "build", "hatchling"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = "-ra -q"
+markers = [
+    "network: tests that require network access (skipped by default)",
+]
+
 [project.urls]
 Homepage = "https://github.com/hypertidy/gdalxarray"
 Repository = "https://github.com/hypertidy/gdalxarray"
