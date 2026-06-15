@@ -44,7 +44,7 @@ requires-python = ">=3.10"
 dependencies = [
     "packaging",
     "affine",
-    "rasterix",
+    "rasterix>=0.2,<0.3",
     "xarray>=2025.6",
     "numpy",
     "dask",
@@ -59,9 +59,9 @@ dev = ["pytest>=7", "ruff>=0.7", "pre-commit", "build", "hatchling"]
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
-addopts = "-ra -q"
+addopts = "-ra -q -m 'not network'"
 markers = [
-    "network: tests that require network access (skipped by default)",
+    "network: tests that require network access (skipped by default; run with `pytest -m network`)",
 ]
 
 [project.urls]
@@ -76,6 +76,7 @@ gdalxarray = "gdalxarray.backend:GDALBackendEntrypoint"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+exclude = ["docs"]
 
 [tool.ruff.lint]
 select = [
