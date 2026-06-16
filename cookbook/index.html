@@ -687,16 +687,11 @@ os.environ.setdefault(&quot;CPL_VSIL_CURL_USE_HEAD&quot;, &quot;NO&quot;)
 <code>osgeo.gdal</code> module; environment variables are easier to make
 reproducible in notebooks.</p>
 <h2 id="nci-thredds-rate-limited-https-source">NCI THREDDS (rate-limited HTTPS source)</h2>
-<p>Some institutional servers - notably NCI - rate-limit aggressive parallel
-reads. The recipe is to cap GDAL's read parallelism:</p>
-<pre><code class="language-python">from osgeo import gdal
-gdal.SetConfigOption(&quot;GDAL_NUM_THREADS&quot;, &quot;4&quot;)
-gdal.SetConfigOption(&quot;CPL_VSIL_CURL_USE_HEAD&quot;, &quot;NO&quot;)
+<p>Some institutional servers rate-limit aggressive parallel
+reads. The recipe is to cap  parallelism, we find that 8 is safe for <a href="https://thredds.nci.org.au/">NCI Thredds</a>. </p>
+<pre><code class="language-python">import dask
+dask.config.set(scheduler='threads', num_workers=8)
 </code></pre>
-<p><code>GDAL_NUM_THREADS=ALL_CPUS</code> (the default for some operations) can produce
-truncated reads that look like data corruption but are actually
-HTTP-level throttling. <code>4</code> is a defensible default for <code>/vsicurl/</code>
-against institutional servers.</p>
 <hr />
 <h2 id="noaa-oisst-sea-surface-temperature">NOAA OISST sea surface temperature</h2>
 <p>A single daily file over plain HTTPS, no auth.</p>
@@ -733,11 +728,10 @@ virtualization composes through.</p>
 ~135 TB of NetCDF on NCI THREDDS, virtualized as Zarr via a
 kerchunk-Parquet reference manifest hosted at Pawsey. Per-variable
 yearly manifests; daily 4-D ocean fields.</p>
-<pre><code class="language-python">from osgeo import gdal
-import xarray as xr
+<pre><code class="language-python">import xarray as xr
 
-gdal.SetConfigOption(&quot;GDAL_NUM_THREADS&quot;, &quot;4&quot;)
-gdal.SetConfigOption(&quot;CPL_VSIL_CURL_USE_HEAD&quot;, &quot;NO&quot;)
+import dask
+dask.config.set(scheduler='threads', num_workers=8)
 
 url = (
     &quot;vrt:///vsicurl/https://projects.pawsey.org.au/aad-index/&quot;
@@ -748,7 +742,7 @@ ds = xr.open_dataset(
     drop_variables=[&quot;Time_bnds&quot;, &quot;DT&quot;, &quot;average_DT&quot;, &quot;average_T1&quot;, &quot;average_T2&quot;],
 )
 
-# Date-string slicing over a virtualized 3 TB store, in microseconds:
+# Date-string slicing over a virtualized store
 ds.sel(Time=&quot;2010-01-30&quot;).temp.values
 </code></pre>
 <p>The store opens in seconds; <code>.values</code> triggers the actual byte-range
