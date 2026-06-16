@@ -30,11 +30,12 @@ bug.
 ### Pangeo notebook
 
 ```bash
-docker run --rm -it -p 8888:8888 quay.io/pangeo/pangeo-notebook:latest
+docker run --rm -it  quay.io/pangeo/pangeo-notebook:latest bash
+pip install gdalxarray
 ```
 
-The Pangeo image is a known-working profile (verified with GDAL 3.12.1 and
-numpy 2.3) and ships JupyterLab.
+The Pangeo image is a known-working profile (verified with GDAL 3.12.3 and
+numpy 2.4.6) and ships JupyterLab.
 
 ### osgeo/gdal
 
@@ -42,6 +43,11 @@ For a GDAL-only base image:
 
 ```bash
 docker run --rm -it ghcr.io/osgeo/gdal:ubuntu-small-latest bash
+
+## example using venv
+apt-get update && apt-get install -y python3-pip python3-venv
+python3 -m venv .venv
+. .venv/bin/activate
 pip install gdalxarray
 ```
 
@@ -49,19 +55,23 @@ pip install gdalxarray
 
 conda-forge has well-maintained GDAL builds for Linux, macOS, and Windows.
 
+This was tried on ubuntu. 
+
 ```bash
+DEBIAN_FRONTEND=noninteractive apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y wget python3
+
+
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+## interactive step requires input
+bash Miniforge3-Linux-x86_64.sh
+bash
 mamba create -n gdalxarray -c conda-forge python gdal numpy xarray dask
 mamba activate gdalxarray
 pip install gdalxarray
 ```
 
-Or with `pixi`:
-
-```bash
-pixi init gdalxarray-env
-pixi add gdal numpy xarray dask
-pixi run pip install gdalxarray
-```
+Or with `pixi` (see https://github.com/hypertidy/gdalxarray/issues/28)
 
 A minimum-viable `environment.yml`:
 
