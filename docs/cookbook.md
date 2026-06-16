@@ -29,19 +29,13 @@ reproducible in notebooks.
 
 ## NCI THREDDS (rate-limited HTTPS source)
 
-Some institutional servers - notably NCI - rate-limit aggressive parallel
-reads. The recipe is to cap GDAL's read parallelism:
+Some institutional servers rate-limit aggressive parallel
+reads. The recipe is to cap  parallelism, we find that 8 is safe for [NCI Thredds](https://thredds.nci.org.au/). 
 
 ```python
-from osgeo import gdal
-gdal.SetConfigOption("GDAL_NUM_THREADS", "4")
-gdal.SetConfigOption("CPL_VSIL_CURL_USE_HEAD", "NO")
+import dask
+dask.config.set(scheduler='threads', num_workers=8)
 ```
-
-`GDAL_NUM_THREADS=ALL_CPUS` (the default for some operations) can produce
-truncated reads that look like data corruption but are actually
-HTTP-level throttling. `4` is a defensible default for `/vsicurl/`
-against institutional servers.
 
 ---
 
@@ -95,11 +89,10 @@ kerchunk-Parquet reference manifest hosted at Pawsey. Per-variable
 yearly manifests; daily 4-D ocean fields.
 
 ```python
-from osgeo import gdal
 import xarray as xr
 
-gdal.SetConfigOption("GDAL_NUM_THREADS", "4")
-gdal.SetConfigOption("CPL_VSIL_CURL_USE_HEAD", "NO")
+import dask
+dask.config.set(scheduler='threads', num_workers=8)
 
 url = (
     "vrt:///vsicurl/https://projects.pawsey.org.au/aad-index/"
@@ -110,7 +103,7 @@ ds = xr.open_dataset(
     drop_variables=["Time_bnds", "DT", "average_DT", "average_T1", "average_T2"],
 )
 
-# Date-string slicing over a virtualized 3 TB store, in microseconds:
+# Date-string slicing over a virtualized store
 ds.sel(Time="2010-01-30").temp.values
 ```
 
