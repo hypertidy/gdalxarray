@@ -365,6 +365,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#engine-entrypoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine entrypoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#gdalxarray.GDALBackendEntrypoint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -391,6 +402,39 @@
     <span class="md-ellipsis">
       
         open_dataset
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recipe-builders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipe builders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gdalxarray.warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gdalxarray.warp.warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp
       
     </span>
   </a>
@@ -459,6 +503,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#engine-entrypoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine entrypoint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#gdalxarray.GDALBackendEntrypoint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -491,6 +546,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#recipe-builders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipe builders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gdalxarray.warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gdalxarray.warp.warp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        warp
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -513,6 +601,9 @@
 
 <!-- docs/api.md -->
 <h1 id="api-reference">API Reference</h1>
+<h2 id="engine-entrypoint">Engine entrypoint</h2>
+<p>The xarray engine itself. Most users invoke it via
+<code>xr.open_dataset(path, engine="gdalxarray", ...)</code> rather than directly.</p>
 
 
 <div class="doc doc-object doc-class">
@@ -701,6 +792,340 @@ bands carry semantically distinct quantities.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="recipe-builders">Recipe builders</h2>
+<p>Helper functions that build GDAL configuration recipes - VRT strings,
+typically - for downstream consumption by the engine.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="gdalxarray.warp"></a>
+    <div class="doc doc-contents first">
+
+        <p>Lazy warp-VRT recipe construction.</p>
+<p>The :func:<code>warp</code> function builds a description of a warp operation —
+target CRS, resolution, bounds, GCP/RPC/geoloc transformer, cutline,
+etc. — and returns it as VRT XML text. The result composes with
+:class:<code>GDALBackendEntrypoint</code>::</p>
+<pre><code>&gt;&gt;&gt; import gdalxarray
+&gt;&gt;&gt; import xarray as xr
+&gt;&gt;&gt; vrt = gdalxarray.warp(source, crs="+proj=laea")
+&gt;&gt;&gt; ds = xr.open_dataset(vrt, engine="gdalxarray", multidim=False)
+</code></pre>
+<p>No pixels are read or written by <code>warp()</code> — the VRT is a recipe.
+Bytes flow only when the consumer (xarray, gdalwarp, gdal_translate)
+asks for a window.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="gdalxarray.warp.warp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">warp</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">crs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resampling</span><span class="o">=</span><span class="s1">&#39;near&#39;</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">src_nodata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">bands</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">warp_options</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build a warped-VRT recipe string.</p>
+<p>Wraps :func:<code>gdal.Warp</code> with <code>format="VRT"</code> to produce a textual
+description of a reprojection / regrid / warp. The result is a
+self-contained VRT XML string that downstream tools can read lazily.</p>
+<p>The named keyword arguments cover the common cases. Any further
+:func:<code>gdal.WarpOptions</code> keyword can be passed as an additional
+keyword argument and is forwarded verbatim — see GDAL's
+<code>gdal.WarpOptions</code> documentation for the full list (transformer
+options for RPC/GCPs/geolocation arrays, cutlines, alpha-band
+handling, working type, etc.).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>source</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>GDAL-recognised source path or URI. Anything <code>gdal.Open</code> can
+handle: local file, <code>/vsicurl/</code>, <code>/vsis3/</code>, <code>vrt://</code>,
+<code>ZARR:"..."</code>, <code>NETCDF:...:var</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>crs</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> or <span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Target CRS as PROJ string, WKT, or EPSG code. Maps to GDAL's
+<code>dstSRS</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bbox</code>
+            </td>
+            <td>
+                  <code>sequence of 4 floats</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output bounding box <code>(xmin, ymin, xmax, ymax)</code> in target CRS
+units. Maps to GDAL's <code>outputBounds</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>shape</code>
+            </td>
+            <td>
+                  <code>tuple of 2 ints</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output <code>(width, height)</code> in pixels. Maps to GDAL's <code>width</code>
+and <code>height</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resolution</code>
+            </td>
+            <td>
+                  <code>float or tuple of 2 floats</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output resolution. A scalar means isotropic <code>(res, res)</code>. A
+tuple is <code>(xres, yres)</code>. Maps to GDAL's <code>xRes</code> / <code>yRes</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resampling</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resampling algorithm: <code>"near"</code>, <code>"bilinear"</code>, <code>"cubic"</code>,
+<code>"cubicspline"</code>, <code>"lanczos"</code>, <code>"average"</code>, <code>"mode"</code>,
+<code>"min"</code>, <code>"max"</code>, <code>"med"</code>, <code>"q1"</code>, <code>"q3"</code>, <code>"sum"</code>,
+<code>"rms"</code>. Maps to GDAL's <code>resampleAlg</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>``&#34;near&#34;``</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nodata</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output nodata value. Maps to GDAL's <code>dstNodata</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>src_nodata</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Override the source nodata value. Maps to GDAL's <code>srcNodata</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>bands</code>
+            </td>
+            <td>
+                  <code>list of int</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Subset of source bands to warp (1-based). Maps to GDAL's
+<code>srcBands</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**warp_options</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Any other keyword argument is forwarded to :func:<code>gdal.WarpOptions</code>
+verbatim. Common power-user options: <code>rpc=True</code>,
+<code>tps=True</code>, <code>geoloc=True</code>, <code>transformerOptions=[...]</code>,
+<code>cutlineWKT="POLYGON(...)"</code>, <code>cropToCutline=True</code>,
+<code>coordinateOperation="+proj=..."</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>VRT XML describing the warped output. Suitable for
+<code>xr.open_dataset(..., engine="gdalxarray")</code>, for any GDAL
+tool that accepts a path, or for writing to a <code>.vrt</code> file as
+a portable, durable warp recipe.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Runtime-only options (<code>multithread</code>, <code>warpMemoryLimit</code>,
+<code>creationOptions</code>, <code>callback</code>, <code>callback_data</code>) are not
+serialised into the VRT description — they affect <em>how</em> a warp is
+executed, not <em>what</em> the warp produces. Passing them to <code>warp()</code>
+emits a :class:<code>UserWarning</code> and they are dropped. To control
+runtime behaviour for the eventual read, set GDAL config options
+on the consumer side, e.g.::</p>
+<pre><code>gdal.SetConfigOption("GDAL_NUM_THREADS", "4")
+ds = xr.open_dataset(vrt, engine="gdalxarray")
+</code></pre>
+</details>
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <p>Reproject anything to Lambert Azimuthal Equal Area, lazily::</p>
+<pre><code>vrt = warp(src, crs="+proj=laea")
+ds = xr.open_dataset(vrt, engine="gdalxarray", multidim=False)
+</code></pre>
+<p>Specific target grid::</p>
+<pre><code>vrt = warp(
+    src,
+    crs="EPSG:3577",
+    bbox=(-2000000, -5000000, 2000000, -1000000),
+    resolution=1000,
+    resampling="bilinear",
+)
+</code></pre>
+<p>Drone imagery with GCPs, warped via thin-plate splines::</p>
+<pre><code>vrt = warp(src, crs="EPSG:32755", tps=True)
+</code></pre>
+<p>Satellite Level-1B product with RPCs and a DEM::</p>
+<pre><code>vrt = warp(
+    src,
+    crs="EPSG:4326",
+    rpc=True,
+    transformerOptions=["RPC_DEM=/path/to/dem.tif"],
+)
+</code></pre>
 
 
     </div>
