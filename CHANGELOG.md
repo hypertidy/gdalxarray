@@ -1,8 +1,18 @@
 # Changelog
 
 
-## [Unreleased]
+## [0.4.0]
 
+### Added
+
+- `gdalxarray.warp()` — build lazy warp-VRT recipes for reprojection,
+  regridding, GCP/RPC/geolocation-array transformation, cutline clipping,
+  and resampling. Returns a VRT XML string that composes with the
+  `gdalxarray` engine: only the bytes the consumer reads are
+  materialised. Common args (`crs`, `bbox`, `shape`, `resolution`,
+  `resampling`, `nodata`) plus a full escape hatch for any
+  `gdal.WarpOptions` keyword.
+  
 ### Changed
 
 - Classic-raster open (`multidim=False`) on a file with no bands but

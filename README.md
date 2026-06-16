@@ -117,6 +117,26 @@ ds["temperature"].sel(time="2024-06", level=500).isel(latitude=slice(100, 200))
 
 `multidim=True` is the default for `engine="gdalxarray"`.
 
+
+### 4. Warp recipes — lazy reprojection
+
+For warping any GDAL-readable source into a target CRS, grid, or
+projection, ``gdalxarray.warp`` returns a VRT recipe string rather than
+materialising pixels:
+
+```python
+import gdalxarray
+import xarray as xr
+
+vrt = gdalxarray.warp(source, crs="+proj=laea")
+ds = xr.open_dataset(vrt, engine="gdalxarray", multidim=False)
+```
+
+The full warp configuration (target CRS, GCPs/RPCs/geolocation arrays,
+cutlines, resampling) is encoded in ~2 KB of VRT XML. Only the bytes
+your code actually reads flow over the network or off disk.
+
+
 ## Composing with GDAL virtual paths
 
 The three modes above combine with GDAL's virtualization layers to cover

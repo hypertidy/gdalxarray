@@ -1,6 +1,6 @@
-"""gdalxarray - an xarray backend powered by GDAL."""
+"""gdalxarray — an xarray backend powered by GDAL."""
 
-# Friendly error when GDAL bindings are missing - gdalxarray cannot work without
+# Friendly error when GDAL bindings are missing — gdalxarray cannot work without
 # them and there is no fallback (osgeo.gdal has no PyPI wheels).
 try:
     from osgeo import gdal as _gdal  # noqa: F401  (used by .backend, re-exported for env check)
@@ -16,8 +16,9 @@ except ImportError as e:
 
 # Single source of truth for the version string. Hatchling parses this line
 # at build time via [tool.hatch.version] path = "gdalxarray/__init__.py".
-__version__ = "0.3.1.9001"
+__version__ = "0.4.0"
 
 from .backend import GDALBackendEntrypoint
+from .warp import warp
 
-__all__ = ["GDALBackendEntrypoint", "__version__"]
+__all__ = ["GDALBackendEntrypoint", "__version__", "warp"]
