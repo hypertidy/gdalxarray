@@ -348,6 +348,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#4-warp-recipes-lazy-reprojection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Warp recipes — lazy reprojection
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -606,6 +617,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#4-warp-recipes-lazy-reprojection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Warp recipes — lazy reprojection
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -769,6 +791,19 @@ dims and coords come from the source.</p>
 ds[&quot;temperature&quot;].sel(time=&quot;2024-06&quot;, level=500).isel(latitude=slice(100, 200))
 </code></pre>
 <p><code>multidim=True</code> is the default for <code>engine="gdalxarray"</code>.</p>
+<h3 id="4-warp-recipes-lazy-reprojection">4. Warp recipes — lazy reprojection</h3>
+<p>For warping any GDAL-readable source into a target CRS, grid, or
+projection, <code>gdalxarray.warp</code> returns a VRT recipe string rather than
+materialising pixels:</p>
+<pre><code class="language-python">import gdalxarray
+import xarray as xr
+
+vrt = gdalxarray.warp(source, crs=&quot;+proj=laea&quot;)
+ds = xr.open_dataset(vrt, engine=&quot;gdalxarray&quot;, multidim=False)
+</code></pre>
+<p>The full warp configuration (target CRS, GCPs/RPCs/geolocation arrays,
+cutlines, resampling) is encoded in ~2 KB of VRT XML. Only the bytes
+your code actually reads flow over the network or off disk.</p>
 <h2 id="composing-with-gdal-virtual-paths">Composing with GDAL virtual paths</h2>
 <p>The three modes above combine with GDAL's virtualization layers to cover
 nearly every cloud-native and remote-data scenario. None of these
