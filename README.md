@@ -30,7 +30,7 @@ recommended paths, in order of friction:
 - **System package manager** (apt, brew) plus matching system Python bindings
 
 Then `pip install gdalxarray` for the engine itself. See
-[**INSTALL.md**](docs/install.md) for the full guide, including troubleshooting
+[**INSTALL.md**](https://hypertidy.github.io/gdalxarray/install/) for the full guide, including troubleshooting
 for NumPy ABI mismatches and Python version pinning.
 
 ## Why this exists (vs rioxarray)
@@ -177,13 +177,13 @@ own data model is N-dimensional with named axes:
 ## Status
 
 Active development. The API has settled but small changes are
-possible before 1.0. See [`CHANGELOG.md`](docs/changelog.md) for what's
+possible before 1.0. See [`CHANGELOG.md`](https://hypertidy.github.io/gdalxarray/changelog/) for what's
 landed and the [issue tracker](https://github.com/hypertidy/gdalxarray/issues)
 for what's next.
 
 For worked examples against real cloud-native data
 (BRAN2023 ocean reanalysis, ECMWF AIFS forecasts, CMEMS sea level,
-NOAA OISST), see [`docs/cookbook.md`](docs/cookbook.md).
+NOAA OISST), see [`docs/cookbook.md`](https://hypertidy.github.io/gdalxarray/cookbook/).
 
 
 ## License
