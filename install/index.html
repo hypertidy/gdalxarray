@@ -698,26 +698,37 @@ includes GDAL 3.12+, the Python bindings, numpy 2.x, and the standard hypertidy
 toolchain. Tests pass here; if something works elsewhere but not here, it's a
 bug.</p>
 <h3 id="pangeo-notebook">Pangeo notebook</h3>
-<pre><code class="language-bash">docker run --rm -it -p 8888:8888 quay.io/pangeo/pangeo-notebook:latest
+<pre><code class="language-bash">docker run --rm -it  quay.io/pangeo/pangeo-notebook:latest bash
+pip install gdalxarray
 </code></pre>
-<p>The Pangeo image is a known-working profile (verified with GDAL 3.12.1 and
-numpy 2.3) and ships JupyterLab.</p>
+<p>The Pangeo image is a known-working profile (verified with GDAL 3.12.3 and
+numpy 2.4.6) and ships JupyterLab.</p>
 <h3 id="osgeogdal">osgeo/gdal</h3>
 <p>For a GDAL-only base image:</p>
 <pre><code class="language-bash">docker run --rm -it ghcr.io/osgeo/gdal:ubuntu-small-latest bash
+
+## example using venv
+apt-get update &amp;&amp; apt-get install -y python3-pip python3-venv
+python3 -m venv .venv
+. .venv/bin/activate
 pip install gdalxarray
 </code></pre>
 <h2 id="conda-mamba-pixi">conda / mamba / pixi</h2>
 <p>conda-forge has well-maintained GDAL builds for Linux, macOS, and Windows.</p>
-<pre><code class="language-bash">mamba create -n gdalxarray -c conda-forge python gdal numpy xarray dask
+<p>This was tried on ubuntu. </p>
+<pre><code class="language-bash">DEBIAN_FRONTEND=noninteractive apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y wget python3
+
+
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+## interactive step requires input
+bash Miniforge3-Linux-x86_64.sh
+bash
+mamba create -n gdalxarray -c conda-forge python gdal numpy xarray dask
 mamba activate gdalxarray
 pip install gdalxarray
 </code></pre>
-<p>Or with <code>pixi</code>:</p>
-<pre><code class="language-bash">pixi init gdalxarray-env
-pixi add gdal numpy xarray dask
-pixi run pip install gdalxarray
-</code></pre>
+<p>Or with <code>pixi</code> (see https://github.com/hypertidy/gdalxarray/issues/28)</p>
 <p>A minimum-viable <code>environment.yml</code>:</p>
 <pre><code class="language-yaml">name: gdalxarray
 channels:
