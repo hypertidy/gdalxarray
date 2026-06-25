@@ -16,7 +16,7 @@ except ImportError as e:
 
 # Single source of truth for the version string. Hatchling parses this line
 # at build time via [tool.hatch.version] path = "gdalxarray/__init__.py".
-__version__ = "0.4.0"
+__version__ = "0.4.0.9001"
 
 from .backend import GDALBackendEntrypoint
 from .warp import warp

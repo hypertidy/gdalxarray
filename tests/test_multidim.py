@@ -138,3 +138,5 @@ def test_no_live_objects_in_encoding(backend, foo5_vrt):
         assert val is None or isinstance(val, (str, int, float, bool)), (
             f"encoding[{key!r}] is a {type(val).__name__}, not serialization-safe"
         )
+
+

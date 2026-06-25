@@ -1,5 +1,25 @@
 # Changelog
 
+## [dev]
+
+### Fixed
+
+- CF decoding (`scale_factor`, `add_offset`, `_FillValue`) now applies
+  automatically when reading. Previously gdalxarray exposed GDAL's
+  scale/offset/nodata under non-CF attribute names, which prevented
+  xarray's CF decoder from applying value transformation and fill-value
+  masking. The result was raw integer values and sentinel-valued land
+  pixels in scaled scientific data (OISST, CMEMS, ERA5, etc.) — silently
+  wrong. The fix renames attributes to CF-standard names in both
+  classic-raster and multidim modes, makes the backend signature accept
+  xarray's decoder kwargs, and explicitly applies CF decoding before
+  returning the Dataset.
+  
+  Breaking for users explicitly accessing `ds.attrs["scale"]`,
+  `ds.attrs["offset"]`, or `ds.attrs["nodata"]`. These are now
+  `ds.encoding["scale_factor"]`, `ds.encoding["add_offset"]`, and
+  `ds.encoding["_FillValue"]` after decoding (or in `ds.attrs[...]`
+  before decoding if `mask_and_scale=False` is passed).
 
 ## [0.4.0] - 2026-06-16
 

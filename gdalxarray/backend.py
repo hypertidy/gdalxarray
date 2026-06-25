@@ -531,13 +531,19 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
     def open_dataset(
         self,
-        filename_or_obj: str,
+        filename_or_obj,
         *,
-        drop_variables: Iterable[Hashable] | None = None,
-        chunks: dict[Hashable, int] | None = None,
-        multidim: bool = True,
-        group: str | None = None,
-        band_as_dim: bool = True,
+        drop_variables=None,
+        chunks=None,
+        multidim=True,
+        group=None,
+        band_as_dim=True,
+        mask_and_scale=None,
+        decode_times=None,
+        decode_timedelta=None,
+        use_cftime=None,
+        concat_characters=None,
+        decode_coords=None,
     ) -> xr.Dataset:
         """Open a dataset using GDAL.
 
@@ -671,29 +677,34 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         attrs = {"descriptions": descriptions}
         coords = {"band": np.array(band_indices)}
 
-        nodatas_set = set(n for n in nodatas if n is not None)
-        if len(nodatas_set) == 1 and all(n is not None for n in nodatas):
-            attrs["nodata"] = nodatas[0]
-        elif any(n is not None for n in nodatas):
-            coords["nodata"] = (
-                "band",
-                np.array([n if n is not None else np.nan for n in nodatas]),
-            )
-
+        # _FillValue: scalar if all bands agree, per-band coord otherwise.
+        # Skip if all bands have no nodata.
+        if all(n is None for n in nodatas):
+            pass
+        elif len(set(n for n in nodatas if n is not None)) == 1 and None not in nodatas:
+            attrs["_FillValue"] = nodatas[0]
+        else:
+            # Mixed or partially-set: per-band coord. Use NaN for unset.
+            coords["_FillValue"] = ("band", np.array(
+                [n if n is not None else np.nan for n in nodatas]
+            ))
+        
+        # scale_factor: skip default 1.0, scalar if all agree, per-band otherwise.
         if all(s == 1.0 for s in scales):
             pass
         elif len(set(scales)) == 1:
-            attrs["scale"] = scales[0]
+            attrs["scale_factor"] = scales[0]
         else:
-            coords["scale"] = ("band", np.array(scales))
-
+            coords["scale_factor"] = ("band", np.array(scales))
+        
+        # add_offset: skip default 0.0, scalar if all agree, per-band otherwise.
         if all(o == 0.0 for o in offsets):
             pass
         elif len(set(offsets)) == 1:
-            attrs["offset"] = offsets[0]
+            attrs["add_offset"] = offsets[0]
         else:
-            coords["offset"] = ("band", np.array(offsets))
-
+            coords["add_offset"] = ("band", np.array(offsets))
+        
         da_obj = xr.DataArray(
             data,
             dims=["band", "y", "x"],
@@ -704,7 +715,10 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         if drop_variables and "band_data" in drop_variables:
             return xr.Dataset()
-        return xr.Dataset({"band_data": da_obj})
+
+        ds = xr.Dataset({"band_data": da_obj})
+        ds = xr.decode_cf(ds, decode_times=False)
+        return ds
 
     def _raster_as_vars(self, filename_or_obj, dataset, chunks, drop_variables, num_bands):
         """Each band as a separate (y, x) data variable."""
@@ -739,15 +753,17 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 data = indexing.LazilyIndexedArray(backend_array)
 
             band_attrs = {
-                "nodata": band.GetNoDataValue(),
-                "scale": band.GetScale() or 1.0,
-                "offset": band.GetOffset() or 0.0,
+                "_FillValue": band.GetNoDataValue(),
+                "scale_factor": band.GetScale() or 1.0,
+                "add_offset": band.GetOffset() or 0.0,
             }
             band_attrs = {k: v for k, v in band_attrs.items() if v is not None}
 
             data_vars[band_name] = xr.DataArray(data, dims=["y", "x"], attrs=band_attrs)
 
-        return xr.Dataset(data_vars)
+        ds = xr.Dataset(data_vars)
+        ds = xr.decode_cf(ds, decode_times=False)
+        return ds
 
     # ------------------------------------------------------------------
     # Multidim path
@@ -825,6 +841,22 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 if attr_value is not None:
                     attrs[attr_name] = attr_value
 
+            # Synthesise CF attributes from GDAL's direct accessors. The NetCDF
+            # multidim driver exposes these via GetScale()/GetOffset()/GetNoDataValueAsDouble()
+            # rather than as CF-named attribute entries, so we surface them
+            # under the names xarray's CF decoder expects.
+            scale = mdarray.GetScale()
+            if scale is not None and scale != 1.0:
+                attrs.setdefault("scale_factor", scale)
+            
+            offset = mdarray.GetOffset()
+            if offset is not None and offset != 0.0:
+                attrs.setdefault("add_offset", offset)
+            
+            nodata = mdarray.GetNoDataValueAsDouble()
+            if nodata is not None:
+                attrs.setdefault("_FillValue", nodata)
+                
             is_coord = any(dim.GetName() == array_name for dim in dims)
 
             if is_coord and len(dim_names) == 1:
@@ -859,6 +891,8 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds.encoding["source"] = filename_or_obj
         if driver_name:
             ds.encoding["gdal_driver"] = driver_name
+      
+        ds = xr.decode_cf(ds, decode_times=False)
         return ds
 
     # ------------------------------------------------------------------

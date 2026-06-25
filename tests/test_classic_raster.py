@@ -7,6 +7,7 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 import pytest
+import xarray as xr 
 
 from gdalxarray import GDALBackendEntrypoint
 
@@ -65,7 +66,7 @@ def test_band_descriptions_attached(backend, synthetic_geotiff):
 def test_uniform_nodata_as_scalar_attr(backend, synthetic_geotiff):
     """All bands share nodata=-9999, so it should be a scalar attr."""
     ds = backend.open_dataset(synthetic_geotiff, multidim=False)
-    assert ds["band_data"].attrs["nodata"] == -9999.0
+    assert ds["band_data"].encoding["_FillValue"] == -9999.0
 
 
 # -- band_as_dim=False (legacy per-variable layout) -----------------------
@@ -203,3 +204,30 @@ def test_netcdf_classic_lists_subdatasets(backend):
     msg = str(excinfo.value)
     assert "subdataset" in msg.lower()
     assert "multidim=True" in msg
+
+def test_cf_decode_band_as_dim(synthetic_geotiff_with_scale):
+    """band_as_dim=True case: decoded float64 with scale/fill applied."""
+    ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray", multidim=False)
+    assert ds.band_data.dtype == np.float64
+    assert ds.band_data.values[0, 50, 50] == pytest.approx(10.0)  # 1000 * 0.01
+    assert np.isnan(ds.band_data.values[0, 0, 0])  # fill -> NaN
+
+
+def test_cf_decode_band_as_vars(synthetic_geotiff_with_scale):
+    """band_as_dim=False case: same decoding, per-variable."""
+    ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray",
+                          multidim=False, band_as_dim=False)
+    var_name = list(ds.data_vars)[0]
+    assert ds[var_name].dtype == np.float64
+    assert ds[var_name].values[50, 50] == pytest.approx(10.0)
+    assert np.isnan(ds[var_name].values[0, 0])
+
+
+def test_cf_scale_and_fillvalue_applied(synthetic_geotiff_with_scale):
+    import numpy as np
+    ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray", multidim=False)
+    assert ds.band_data.dtype == np.float64
+    # stored 1000 * 0.01 = 10.0
+    assert ds.band_data.values[0, 50, 50] == pytest.approx(10.0)
+    # -999 → NaN
+    assert np.isnan(ds.band_data.values[0, 0, 0])
