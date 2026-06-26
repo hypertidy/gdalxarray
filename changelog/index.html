@@ -913,17 +913,17 @@
 <li>Classic-raster open (<code>multidim=False</code>) on a file with no bands but
   subdatasets now raises a <code>ValueError</code> listing the available
   subdataset paths and pointing at <code>multidim=True</code>. Previously this
-  produced an empty 512x512 stub Dataset. </li>
+  produced an empty 512x512 stub Dataset.</li>
 </ul>
 <h2 id="030-2026-06-15"><a href="https://github.com/hypertidy/gdalxarray/compare/v0.2.0...v0.3.0">0.3.0</a> - 2026-06-15</h2>
 <h3 id="added_1">Added</h3>
 <ul>
 <li><code>band_as_dim</code> parameter on <code>open_dataset</code> (classic raster mode, default <code>True</code>).
-  Bands now become an xarray <code>band</code> dimension on a single <code>band_data</code> DataArray. 
-  Pass <code>band_as_dim=False</code> for per-band-variable layout. </li>
+  Bands now become an xarray <code>band</code> dimension on a single <code>band_data</code> DataArray.
+  Pass <code>band_as_dim=False</code> for per-band-variable layout.</li>
 <li>New <code>GDALMultiBandArray</code> BackendArray reading via
   <code>dataset.ReadAsArray(band_list=...)</code>, letting GDAL handle BIP/BIL/BSQ
-  interleaving internally. </li>
+  interleaving internally.</li>
 <li>Lazy-by-default for classic raster mode: <code>chunks=None</code> now returns a
   <code>LazilyIndexedArray</code>-wrapped Dataset rather than eagerly reading.</li>
 <li><code>ds.encoding["source"]</code> and <code>ds.encoding["gdal_driver"]</code> provenance strings
@@ -952,6 +952,7 @@
 </ul>
 <h3 id="fixed_1">Fixed</h3>
 <ul>
+<li>usable tokenize method in this frisky world</li>
 <li><code>Dataset.ReadAsArray</code> call in <code>GDALMultiBandArray</code> now uses <code>xsize</code>/<code>ysize</code>
   (the Dataset API) rather than <code>win_xsize</code>/<code>win_ysize</code> (which are the Band API).</li>
 <li>Reverse-slice canonicalisation across all axes in all three BackendArray
