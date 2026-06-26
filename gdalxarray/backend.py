@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Hashable, Iterable
 
 import dask.array as da
 import numpy as np
@@ -409,7 +408,13 @@ class GDALMultiDimArray(BackendArray):
         return np.dtype(self._dtype)
 
     def __dask_tokenize__(self):
-        return (type(self).__name__, id(self.mdarray))
+        return (
+            type(self).__name__,
+            self.mdarray.GetFullName(),  # e.g. "/wind_v_10m" — stable within the store
+            self._shape,
+            str(self._dtype),
+            self._chunks,
+        )
 
     def __getitem__(self, key):
         logger.debug("multidim __getitem__ key type=%s key=%r", type(key).__name__, key)
@@ -685,10 +690,11 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             attrs["_FillValue"] = nodatas[0]
         else:
             # Mixed or partially-set: per-band coord. Use NaN for unset.
-            coords["_FillValue"] = ("band", np.array(
-                [n if n is not None else np.nan for n in nodatas]
-            ))
-        
+            coords["_FillValue"] = (
+                "band",
+                np.array([n if n is not None else np.nan for n in nodatas]),
+            )
+
         # scale_factor: skip default 1.0, scalar if all agree, per-band otherwise.
         if all(s == 1.0 for s in scales):
             pass
@@ -696,7 +702,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             attrs["scale_factor"] = scales[0]
         else:
             coords["scale_factor"] = ("band", np.array(scales))
-        
+
         # add_offset: skip default 0.0, scalar if all agree, per-band otherwise.
         if all(o == 0.0 for o in offsets):
             pass
@@ -704,7 +710,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             attrs["add_offset"] = offsets[0]
         else:
             coords["add_offset"] = ("band", np.array(offsets))
-        
+
         da_obj = xr.DataArray(
             data,
             dims=["band", "y", "x"],
@@ -848,15 +854,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             scale = mdarray.GetScale()
             if scale is not None and scale != 1.0:
                 attrs.setdefault("scale_factor", scale)
-            
+
             offset = mdarray.GetOffset()
             if offset is not None and offset != 0.0:
                 attrs.setdefault("add_offset", offset)
-            
+
             nodata = mdarray.GetNoDataValueAsDouble()
             if nodata is not None:
                 attrs.setdefault("_FillValue", nodata)
-                
+
             is_coord = any(dim.GetName() == array_name for dim in dims)
 
             if is_coord and len(dim_names) == 1:
@@ -891,7 +897,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds.encoding["source"] = filename_or_obj
         if driver_name:
             ds.encoding["gdal_driver"] = driver_name
-      
+
         ds = xr.decode_cf(ds, decode_times=False)
         return ds
 

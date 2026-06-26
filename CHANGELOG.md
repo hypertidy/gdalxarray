@@ -14,7 +14,7 @@
   classic-raster and multidim modes, makes the backend signature accept
   xarray's decoder kwargs, and explicitly applies CF decoding before
   returning the Dataset.
-  
+
   Breaking for users explicitly accessing `ds.attrs["scale"]`,
   `ds.attrs["offset"]`, or `ds.attrs["nodata"]`. These are now
   `ds.encoding["scale_factor"]`, `ds.encoding["add_offset"]`, and
@@ -32,24 +32,24 @@
   materialised. Common args (`crs`, `bbox`, `shape`, `resolution`,
   `resampling`, `nodata`) plus a full escape hatch for any
   `gdal.WarpOptions` keyword.
-  
+
 ### Changed
 
 - Classic-raster open (`multidim=False`) on a file with no bands but
   subdatasets now raises a `ValueError` listing the available
   subdataset paths and pointing at `multidim=True`. Previously this
-  produced an empty 512x512 stub Dataset. 
+  produced an empty 512x512 stub Dataset.
 
 ## [0.3.0] - 2026-06-15
 
 ### Added
 
 - `band_as_dim` parameter on `open_dataset` (classic raster mode, default `True`).
-  Bands now become an xarray `band` dimension on a single `band_data` DataArray. 
-  Pass `band_as_dim=False` for per-band-variable layout. 
+  Bands now become an xarray `band` dimension on a single `band_data` DataArray.
+  Pass `band_as_dim=False` for per-band-variable layout.
 - New `GDALMultiBandArray` BackendArray reading via
   `dataset.ReadAsArray(band_list=...)`, letting GDAL handle BIP/BIL/BSQ
-  interleaving internally. 
+  interleaving internally.
 - Lazy-by-default for classic raster mode: `chunks=None` now returns a
   `LazilyIndexedArray`-wrapped Dataset rather than eagerly reading.
 - `ds.encoding["source"]` and `ds.encoding["gdal_driver"]` provenance strings
@@ -78,6 +78,7 @@
 
 ### Fixed
 
+- usable tokenize method in this frisky world
 - `Dataset.ReadAsArray` call in `GDALMultiBandArray` now uses `xsize`/`ysize`
   (the Dataset API) rather than `win_xsize`/`win_ysize` (which are the Band API).
 - Reverse-slice canonicalisation across all axes in all three BackendArray
