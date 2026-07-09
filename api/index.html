@@ -787,11 +787,35 @@ dimension on a single <code>band_data</code> DataArray (the rioxarray-
 compatible idiom). If False, each band becomes a separate data
 variable named after its description (or <code>band_N</code>). The True
 default suits multispectral imagery; False is preferable when
-bands carry semantically distinct quantities.</p>
+bands carry semantically distinct quantities. Bands reporting
+differing nodata/scale/offset cannot be CF-decoded as one
+variable: values are returned raw with per-band metadata in
+band_nodata/band_scale_factor/band_add_offset coordinates and
+a warning is emitted (use <code>band_as_dim=False</code> to decode each
+band independently).</p>
               </div>
             </td>
             <td>
                   <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>mask_and_scale</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True (default), apply CF mask/scale decoding: nodata becomes
+NaN and scale_factor/add_offset are applied, with the original
+values recorded in each variable's <code>encoding</code>. If False,
+return raw values with the CF attributes left in <code>attrs</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>

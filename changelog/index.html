@@ -412,6 +412,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -441,7 +452,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -480,7 +491,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -530,7 +541,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -663,6 +674,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -692,7 +714,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed" class="md-nav__link">
+  <a href="#changed_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -731,7 +753,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#changed_1" class="md-nav__link">
+  <a href="#changed_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -781,7 +803,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#changed_2" class="md-nav__link">
+  <a href="#changed_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changed
@@ -881,6 +903,63 @@
 <h2 id="dev">[dev]</h2>
 <h3 id="fixed">Fixed</h3>
 <ul>
+<li>
+<p>Empty label selections no longer raise or silently return wrong data
+  (#32). pandas emits positional slices with stop &lt; start and a positive
+  step for an empty label selection on a descending coordinate, e.g.
+  <code>sel(latitude=slice(-16.93, -16.87))</code> on a north-up grid. All three
+  BackendArray classes previously "flipped" such slices into forward
+  reads: when the flipped window fell out of bounds GDAL raised
+  <code>RuntimeError: arrayStartIdx + (count-1) * arrayStep &gt;= size</code>, and when
+  it stayed in bounds the read silently returned real data for a
+  selection that should be empty. Slices that are empty under Python
+  slice semantics now return correctly shaped zero-size arrays without
+  touching GDAL. (A reverse read is expressed as step &lt; 0, never as
+  stop &lt; start with a positive step.)</p>
+</li>
+<li>
+<p>A leading <code>~</code> in plain filesystem paths is now expanded (#33). GDAL
+  does not perform tilde expansion, so <code>~/file.tif</code> previously failed
+  with a misleading "not recognized as a supported file format" error.
+  Expansion applies in <code>open_dataset</code>, in <code>guess_can_open</code> (so engine
+  auto-detection also works for <code>~</code> paths), and in <code>warp()</code>. Only
+  <code>os.path.expanduser</code> is applied, and only to strings starting with
+  <code>~</code>: <code>abspath</code>/<code>normpath</code> are deliberately avoided because they
+  corrupt GDAL URIs such as <code>/vsicurl/https://...</code> (collapsing the
+  double slash) and <code>ZARR:</code>/<code>NETCDF:</code> connection strings. All other
+  dsns pass through byte-identical.</p>
+</li>
+<li>
+<p>The <code>mask_and_scale</code> keyword is now honoured (#29). It was previously
+  accepted by <code>open_dataset</code> and silently ignored; <code>mask_and_scale=False</code>
+  now returns raw values with the CF attributes (<code>scale_factor</code>,
+  <code>add_offset</code>, <code>_FillValue</code>) left in <code>attrs</code>, in both classic layouts
+  and multidim mode.</p>
+</li>
+<li>
+<p>Unscaled data keeps its native dtype (#29). The <code>band_as_dim=False</code>
+  path previously attached identity <code>scale_factor=1.0</code> and
+  <code>add_offset=0.0</code> to every variable (GDAL's Python bindings return
+  1.0/0.0 for unset scale/offset), which made CF decoding promote plain
+  unscaled Byte/Int16 imagery to float64. Only informative values are
+  recorded now.</p>
+</li>
+<li>
+<p>Bands with heterogeneous scale/offset/nodata are surfaced honestly
+  (#29). With <code>band_as_dim=True</code>, per-band values were previously
+  exposed as coordinates <em>named</em> <code>scale_factor</code>/<code>add_offset</code>/<code>_FillValue</code>,
+  names CF decoding cannot consume on a per-band coordinate: the dataset
+  looked decoded while the values stayed raw. Such values are now
+  provided as <code>band_scale_factor</code>/<code>band_add_offset</code>/<code>band_nodata</code>
+  coordinates with a <code>UserWarning</code> pointing at <code>band_as_dim=False</code>,
+  which decodes each band independently. Attributes that are
+  homogeneous across bands still decode (a shared nodata masks even
+  when scales differ).</p>
+</li>
+</ul>
+<p>Breaking for users reading the old per-band coordinate names
+  <code>scale_factor</code>/<code>add_offset</code>/<code>_FillValue</code> on mixed-band datasets.</p>
+<ul>
 <li>CF decoding (<code>scale_factor</code>, <code>add_offset</code>, <code>_FillValue</code>) now applies
   automatically when reading. Previously gdalxarray exposed GDAL's
   scale/offset/nodata under non-CF attribute names, which prevented
@@ -897,17 +976,29 @@
   <code>ds.encoding["scale_factor"]</code>, <code>ds.encoding["add_offset"]</code>, and
   <code>ds.encoding["_FillValue"]</code> after decoding (or in <code>ds.attrs[...]</code>
   before decoding if <code>mask_and_scale=False</code> is passed).</p>
+<h3 id="changed">Changed</h3>
 <ul>
-<li>
-<p>Expand leading tilde paths, fixes #32. </p>
-</li>
-<li>
-<p>Return empty arrry for zero count reads, fixes #33. </p>
-</li>
-<li>
-<p>Fix dask tokenizing problem, #31. </p>
-</li>
+<li>Chunking is delegated to xarray's managed path (#31, closes #30). The
+  backend no longer constructs dask collections itself: all variables
+  open as lazy arrays, native GDAL block sizes are recorded in each data
+  variable's <code>encoding["preferred_chunks"]</code>, and <code>chunks=</code> is applied
+  once at the end of <code>open_dataset</code> via
+  <code>Dataset.chunk(name_prefix="gdalxarray-", token=&lt;sha256 of the dsn&gt;)</code>,
+  after CF decoding and coordinate assembly. The chunked array class is
+  therefore created by the same chunk manager xarray later uses to
+  recognise it, which fixes "Could not find a Chunk Manager which
+  recognises type ..." errors under dask's expression-array migration,
+  and the explicit token means xarray only ever tokenizes strings, so
+  the unpicklable GDAL handles are never pickled or tokenized.</li>
 </ul>
+<p>Consequences: dask is now an optional dependency (install with
+  <code>gdalxarray[dask]</code> or have dask present when passing <code>chunks=</code>); dask
+  layer names change from <code>gdal-multiband-{path}</code> style to deterministic
+  <code>gdalxarray-{variable}-{token}</code>; dimensions not named in an explicit
+  <code>chunks=</code> mapping keep a single chunk (previously <code>band</code> defaulted to
+  a chunk size of 1; <code>chunks={}</code> still yields per-band chunks via the
+  recorded native block sizes); and CF decoders now always operate on
+  lazy arrays rather than dask collections.</p>
 <h2 id="040-2026-06-16">[0.4.0] - 2026-06-16</h2>
 <h3 id="added">Added</h3>
 <ul>
@@ -919,7 +1010,7 @@
   <code>resampling</code>, <code>nodata</code>) plus a full escape hatch for any
   <code>gdal.WarpOptions</code> keyword.</li>
 </ul>
-<h3 id="changed">Changed</h3>
+<h3 id="changed_1">Changed</h3>
 <ul>
 <li>Classic-raster open (<code>multidim=False</code>) on a file with no bands but
   subdatasets now raises a <code>ValueError</code> listing the available
@@ -942,7 +1033,7 @@
   in encoding).</li>
 <li><code>[tool.ruff]</code> config + <code>.pre-commit-config.yaml</code> for lint and format.</li>
 </ul>
-<h3 id="changed_1">Changed</h3>
+<h3 id="changed_2">Changed</h3>
 <ul>
 <li><code>gdal.UseExceptions()</code> moved from module import to
   <code>GDALBackendEntrypoint.__init__</code>, guarded with <code>gdal.GetUseExceptions()</code>.
@@ -984,7 +1075,7 @@
   introspection. GDAL refs are now held inside the BackendArrays themselves.</li>
 </ul>
 <h2 id="020-2026-05-12"><a href="https://github.com/hypertidy/gdalxarray/compare/v0.1.0...v0.2.0">0.2.0</a> - 2026-05-12</h2>
-<h3 id="changed_2">Changed</h3>
+<h3 id="changed_3">Changed</h3>
 <ul>
 <li>Renamed package from <code>gdx</code> to <code>gdalxarray</code> for PyPI publication. The original
   <code>gdx</code> name is taken on PyPI by an unrelated GAMS Data Exchange project.</li>
