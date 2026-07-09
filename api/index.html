@@ -727,7 +727,11 @@
               <div class="doc-md-description">
                 <p>Chunk sizes for Dask arrays. <code>None</code> (default) returns a lazy
 non-Dask Dataset; <code>{}</code> uses GDAL's native block sizes;
-an explicit mapping like <code>{"y": 256, "x": 256}</code> is honoured.</p>
+an explicit mapping like <code>{"y": 256, "x": 256}</code> is honoured
+(dimensions not named keep a single chunk). Chunking is
+delegated to <code>Dataset.chunk</code> so chunked arrays are created
+by xarray's active chunk manager rather than by this backend
+(issue #31); dask is only required when chunks is not None.</p>
               </div>
             </td>
             <td>
