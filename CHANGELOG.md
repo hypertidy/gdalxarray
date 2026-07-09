@@ -4,6 +4,57 @@
 
 ### Fixed
 
+- Empty label selections no longer raise or silently return wrong data
+  (#32). pandas emits positional slices with stop < start and a positive
+  step for an empty label selection on a descending coordinate, e.g.
+  `sel(latitude=slice(-16.93, -16.87))` on a north-up grid. All three
+  BackendArray classes previously "flipped" such slices into forward
+  reads: when the flipped window fell out of bounds GDAL raised
+  `RuntimeError: arrayStartIdx + (count-1) * arrayStep >= size`, and when
+  it stayed in bounds the read silently returned real data for a
+  selection that should be empty. Slices that are empty under Python
+  slice semantics now return correctly shaped zero-size arrays without
+  touching GDAL. (A reverse read is expressed as step < 0, never as
+  stop < start with a positive step.)
+
+- A leading `~` in plain filesystem paths is now expanded (#33). GDAL
+  does not perform tilde expansion, so `~/file.tif` previously failed
+  with a misleading "not recognized as a supported file format" error.
+  Expansion applies in `open_dataset`, in `guess_can_open` (so engine
+  auto-detection also works for `~` paths), and in `warp()`. Only
+  `os.path.expanduser` is applied, and only to strings starting with
+  `~`: `abspath`/`normpath` are deliberately avoided because they
+  corrupt GDAL URIs such as `/vsicurl/https://...` (collapsing the
+  double slash) and `ZARR:`/`NETCDF:` connection strings. All other
+  dsns pass through byte-identical.
+
+- The `mask_and_scale` keyword is now honoured (#29). It was previously
+  accepted by `open_dataset` and silently ignored; `mask_and_scale=False`
+  now returns raw values with the CF attributes (`scale_factor`,
+  `add_offset`, `_FillValue`) left in `attrs`, in both classic layouts
+  and multidim mode.
+
+- Unscaled data keeps its native dtype (#29). The `band_as_dim=False`
+  path previously attached identity `scale_factor=1.0` and
+  `add_offset=0.0` to every variable (GDAL's Python bindings return
+  1.0/0.0 for unset scale/offset), which made CF decoding promote plain
+  unscaled Byte/Int16 imagery to float64. Only informative values are
+  recorded now.
+
+- Bands with heterogeneous scale/offset/nodata are surfaced honestly
+  (#29). With `band_as_dim=True`, per-band values were previously
+  exposed as coordinates *named* `scale_factor`/`add_offset`/`_FillValue`,
+  names CF decoding cannot consume on a per-band coordinate: the dataset
+  looked decoded while the values stayed raw. Such values are now
+  provided as `band_scale_factor`/`band_add_offset`/`band_nodata`
+  coordinates with a `UserWarning` pointing at `band_as_dim=False`,
+  which decodes each band independently. Attributes that are
+  homogeneous across bands still decode (a shared nodata masks even
+  when scales differ).
+
+  Breaking for users reading the old per-band coordinate names
+  `scale_factor`/`add_offset`/`_FillValue` on mixed-band datasets.
+
 - CF decoding (`scale_factor`, `add_offset`, `_FillValue`) now applies
   automatically when reading. Previously gdalxarray exposed GDAL's
   scale/offset/nodata under non-CF attribute names, which prevented
@@ -21,11 +72,29 @@
   `ds.encoding["_FillValue"]` after decoding (or in `ds.attrs[...]`
   before decoding if `mask_and_scale=False` is passed).
 
-- Expand leading tilde paths, fixes #32. 
+### Changed
 
-- Return empty arrry for zero count reads, fixes #33. 
+- Chunking is delegated to xarray's managed path (#31, closes #30). The
+  backend no longer constructs dask collections itself: all variables
+  open as lazy arrays, native GDAL block sizes are recorded in each data
+  variable's `encoding["preferred_chunks"]`, and `chunks=` is applied
+  once at the end of `open_dataset` via
+  `Dataset.chunk(name_prefix="gdalxarray-", token=<sha256 of the dsn>)`,
+  after CF decoding and coordinate assembly. The chunked array class is
+  therefore created by the same chunk manager xarray later uses to
+  recognise it, which fixes "Could not find a Chunk Manager which
+  recognises type ..." errors under dask's expression-array migration,
+  and the explicit token means xarray only ever tokenizes strings, so
+  the unpicklable GDAL handles are never pickled or tokenized.
 
-- Fix dask tokenizing problem, #31. 
+  Consequences: dask is now an optional dependency (install with
+  `gdalxarray[dask]` or have dask present when passing `chunks=`); dask
+  layer names change from `gdal-multiband-{path}` style to deterministic
+  `gdalxarray-{variable}-{token}`; dimensions not named in an explicit
+  `chunks=` mapping keep a single chunk (previously `band` defaulted to
+  a chunk size of 1; `chunks={}` still yields per-band chunks via the
+  recorded native block sizes); and CF decoders now always operate on
+  lazy arrays rather than dask collections.
 
 ## [0.4.0] - 2026-06-16
 

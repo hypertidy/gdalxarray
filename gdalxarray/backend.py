@@ -16,6 +16,7 @@ import hashlib
 import logging
 import os
 import threading
+import warnings
 
 import numpy as np
 import xarray as xr
@@ -614,13 +615,31 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             compatible idiom). If False, each band becomes a separate data
             variable named after its description (or ``band_N``). The True
             default suits multispectral imagery; False is preferable when
-            bands carry semantically distinct quantities.
+            bands carry semantically distinct quantities. Bands reporting
+            differing nodata/scale/offset cannot be CF-decoded as one
+            variable: values are returned raw with per-band metadata in
+            band_nodata/band_scale_factor/band_add_offset coordinates and
+            a warning is emitted (use ``band_as_dim=False`` to decode each
+            band independently).
+        mask_and_scale : bool, optional
+            If True (default), apply CF mask/scale decoding: nodata becomes
+            NaN and scale_factor/add_offset are applied, with the original
+            values recorded in each variable's ``encoding``. If False,
+            return raw values with the CF attributes left in ``attrs``.
         """
         filename_or_obj = _expand_tilde(filename_or_obj)
+        # xarray passes mask_and_scale=None to mean "backend default"; the
+        # default here matches xarray's own (apply CF mask/scale decoding).
+        mask_and_scale = True if mask_and_scale is None else bool(mask_and_scale)
         if multidim:
-            ds = self._open_multidim(filename_or_obj, group, drop_variables)
+            ds = self._open_multidim(
+                filename_or_obj, group, drop_variables, mask_and_scale
+            )
         else:
-            ds = self._open_raster(filename_or_obj, drop_variables, band_as_dim=band_as_dim)
+            ds = self._open_raster(
+                filename_or_obj, drop_variables, band_as_dim=band_as_dim,
+                mask_and_scale=mask_and_scale,
+            )
         return self._maybe_chunk_dataset(ds, chunks, filename_or_obj)
 
     @staticmethod
@@ -658,7 +677,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Classic-raster path
     # ------------------------------------------------------------------
 
-    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True):
+    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True, mask_and_scale=True):
         """Open using GDAL's classic raster API."""
         logger.debug("filename_or_obj: %s", filename_or_obj)
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
@@ -696,9 +715,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         num_bands = dataset.RasterCount
 
         if band_as_dim:
-            ds = self._raster_as_band_dim(filename_or_obj, dataset, drop_variables, num_bands)
+            ds = self._raster_as_band_dim(
+                filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale
+            )
         else:
-            ds = self._raster_as_vars(filename_or_obj, dataset, drop_variables, num_bands)
+            ds = self._raster_as_vars(
+                filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale
+            )
 
         # Spatial coords and CRS for both layouts
         ds = ds.assign_coords(xr.Coordinates.from_xindex(index))
@@ -711,7 +734,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             ds.encoding["gdal_driver"] = driver_name
         return ds
 
-    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands):
+    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True):
         """Bands collapsed into a single ``band`` dimension on ``band_data``."""
         band_indices = list(range(1, num_bands + 1))
         descriptions = []
@@ -739,6 +762,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         attrs = {"descriptions": descriptions}
         coords = {"band": np.array(band_indices)}
+        heterogeneous = []
 
         # _FillValue: scalar if all bands agree, per-band coord otherwise.
         # Skip if all bands have no nodata.
@@ -747,11 +771,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         elif len(set(n for n in nodatas if n is not None)) == 1 and None not in nodatas:
             attrs["_FillValue"] = nodatas[0]
         else:
-            # Mixed or partially-set: per-band coord. Use NaN for unset.
-            coords["_FillValue"] = (
+            # Mixed or partially-set. Deliberately NOT named _FillValue:
+            # CF decoding cannot consume a per-band coordinate, so using
+            # the CF name would make the dataset look decoded while the
+            # values stay raw (issue #29).
+            coords["band_nodata"] = (
                 "band",
                 np.array([n if n is not None else np.nan for n in nodatas]),
             )
+            heterogeneous.append("nodata")
 
         # scale_factor: skip default 1.0, scalar if all agree, per-band otherwise.
         if all(s == 1.0 for s in scales):
@@ -759,7 +787,8 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         elif len(set(scales)) == 1:
             attrs["scale_factor"] = scales[0]
         else:
-            coords["scale_factor"] = ("band", np.array(scales))
+            coords["band_scale_factor"] = ("band", np.array(scales))
+            heterogeneous.append("scale")
 
         # add_offset: skip default 0.0, scalar if all agree, per-band otherwise.
         if all(o == 0.0 for o in offsets):
@@ -767,7 +796,21 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         elif len(set(offsets)) == 1:
             attrs["add_offset"] = offsets[0]
         else:
-            coords["add_offset"] = ("band", np.array(offsets))
+            coords["band_add_offset"] = ("band", np.array(offsets))
+            heterogeneous.append("offset")
+
+        if heterogeneous:
+            warnings.warn(
+                f"Bands of {filename_or_obj!r} report differing "
+                f"{'/'.join(heterogeneous)} values. CF decoding cannot apply "
+                "per-band values to a single band_data variable, so those "
+                "values are left raw, with the per-band metadata available "
+                "in the band_nodata/band_scale_factor/band_add_offset "
+                "coordinates. Open with band_as_dim=False to decode each "
+                "band independently.",
+                UserWarning,
+                stacklevel=4,
+            )
 
         da_obj = xr.DataArray(
             data,
@@ -782,10 +825,10 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             return xr.Dataset()
 
         ds = xr.Dataset({"band_data": da_obj})
-        ds = xr.decode_cf(ds, decode_times=False)
+        ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
         return ds
 
-    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands):
+    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True):
         """Each band as a separate (y, x) data variable."""
         data_vars = {}
 
@@ -806,25 +849,33 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 "x": block_size[0] if block_size[0] > 0 else dataset.RasterXSize,
             }
 
-            band_attrs = {
-                "_FillValue": band.GetNoDataValue(),
-                "scale_factor": band.GetScale() or 1.0,
-                "add_offset": band.GetOffset() or 0.0,
-            }
-            band_attrs = {k: v for k, v in band_attrs.items() if v is not None}
+            # Only record CF attributes that carry information: GDAL's
+            # Python bindings return 1.0/0.0 for unset scale/offset, and a
+            # spurious identity scale_factor makes decode_cf promote every
+            # variable to float64 even for plain unscaled imagery.
+            band_attrs = {}
+            nodata = band.GetNoDataValue()
+            if nodata is not None:
+                band_attrs["_FillValue"] = nodata
+            scale = band.GetScale()
+            if scale is not None and scale != 1.0:
+                band_attrs["scale_factor"] = scale
+            offset = band.GetOffset()
+            if offset is not None and offset != 0.0:
+                band_attrs["add_offset"] = offset
 
             data_vars[band_name] = xr.DataArray(data, dims=["y", "x"], attrs=band_attrs)
             data_vars[band_name].encoding["preferred_chunks"] = preferred_chunks
 
         ds = xr.Dataset(data_vars)
-        ds = xr.decode_cf(ds, decode_times=False)
+        ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
         return ds
 
     # ------------------------------------------------------------------
     # Multidim path
     # ------------------------------------------------------------------
 
-    def _open_multidim(self, filename_or_obj, group, drop_variables):
+    def _open_multidim(self, filename_or_obj, group, drop_variables, mask_and_scale=True):
         """Open using GDAL's multidimensional API."""
         dataset = gdal.OpenEx(filename_or_obj, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly)
         if dataset is None:
@@ -939,7 +990,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         if driver_name:
             ds.encoding["gdal_driver"] = driver_name
 
-        ds = xr.decode_cf(ds, decode_times=False)
+        ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
         return ds
 
     # ------------------------------------------------------------------
