@@ -47,13 +47,15 @@ dependencies = [
     "rasterix>=0.2,<0.3",
     "xarray>=2025.6",
     "numpy",
-    "dask",
     "xproj",
     # GDAL must be installed separately; see INSTALL.md
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+# dask is only needed when opening with chunks= (issue #31): the backend
+# never constructs dask collections itself, chunking goes via Dataset.chunk
+dask = ["dask"]
+test = ["pytest>=7", "dask"]
 dev = ["pytest>=7", "ruff>=0.7", "pre-commit", "build", "hatchling"]
 
 [tool.pytest.ini_options]

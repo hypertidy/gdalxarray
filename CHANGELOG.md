@@ -25,6 +25,8 @@
 
 - Return empty arrry for zero count reads, fixes #33. 
 
+- Fix dask tokenizing problem, #31. 
+
 ## [0.4.0] - 2026-06-16
 
 ### Added

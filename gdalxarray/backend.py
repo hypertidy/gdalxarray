@@ -12,11 +12,11 @@ dispatches to one of two open paths depending on the ``multidim`` flag.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import threading
 
-import dask.array as da
 import numpy as np
 import xarray as xr
 from affine import Affine
@@ -596,7 +596,11 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         chunks : dict, optional
             Chunk sizes for Dask arrays. ``None`` (default) returns a lazy
             non-Dask Dataset; ``{}`` uses GDAL's native block sizes;
-            an explicit mapping like ``{"y": 256, "x": 256}`` is honoured.
+            an explicit mapping like ``{"y": 256, "x": 256}`` is honoured
+            (dimensions not named keep a single chunk). Chunking is
+            delegated to ``Dataset.chunk`` so chunked arrays are created
+            by xarray's active chunk manager rather than by this backend
+            (issue #31); dask is only required when chunks is not None.
         multidim : bool, default True
             If True, use GDAL's multidimensional API
             (``OpenEx`` + ``OF_MULTIDIM_RASTER``). If False, use the classic
@@ -614,14 +618,47 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         """
         filename_or_obj = _expand_tilde(filename_or_obj)
         if multidim:
-            return self._open_multidim(filename_or_obj, chunks, group, drop_variables)
-        return self._open_raster(filename_or_obj, chunks, drop_variables, band_as_dim=band_as_dim)
+            ds = self._open_multidim(filename_or_obj, group, drop_variables)
+        else:
+            ds = self._open_raster(filename_or_obj, drop_variables, band_as_dim=band_as_dim)
+        return self._maybe_chunk_dataset(ds, chunks, filename_or_obj)
+
+    @staticmethod
+    def _maybe_chunk_dataset(ds, chunks, filename_or_obj):
+        """Delegate chunking to xarray's managed path (issue #31).
+
+        The backend never constructs dask collections directly: variables
+        are opened as lazy arrays and chunked here via ``Dataset.chunk``,
+        so the chunked array class is produced by the same chunk manager
+        that xarray later uses to recognise it. A deterministic token
+        derived from the dsn keeps dask layer names stable across sessions
+        without tokenizing the underlying (unpicklable) GDAL handles:
+        with an explicit token, xarray's ``_maybe_chunk`` only tokenizes
+        strings. Chunking runs after CF decoding and coordinate assembly,
+        so decoders operate on lazy arrays and never need to recognise a
+        chunked array class.
+        """
+        if chunks is None:
+            return ds
+        token = hashlib.sha256(
+            str(filename_or_obj).encode("utf-8", "replace")
+        ).hexdigest()[:16]
+        if chunks == {}:
+            # Native GDAL block sizes, recorded per variable at open time
+            # in encoding["preferred_chunks"]. First-wins on any dim shared
+            # by variables reporting different block sizes.
+            merged = {}
+            for var in ds.data_vars.values():
+                for dim, size in (var.encoding.get("preferred_chunks") or {}).items():
+                    merged.setdefault(dim, size)
+            chunks = merged
+        return ds.chunk(dict(chunks), name_prefix="gdalxarray-", token=token)
 
     # ------------------------------------------------------------------
     # Classic-raster path
     # ------------------------------------------------------------------
 
-    def _open_raster(self, filename_or_obj, chunks, drop_variables, band_as_dim=True):
+    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True):
         """Open using GDAL's classic raster API."""
         logger.debug("filename_or_obj: %s", filename_or_obj)
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
@@ -659,11 +696,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         num_bands = dataset.RasterCount
 
         if band_as_dim:
-            ds = self._raster_as_band_dim(
-                filename_or_obj, dataset, chunks, drop_variables, num_bands
-            )
+            ds = self._raster_as_band_dim(filename_or_obj, dataset, drop_variables, num_bands)
         else:
-            ds = self._raster_as_vars(filename_or_obj, dataset, chunks, drop_variables, num_bands)
+            ds = self._raster_as_vars(filename_or_obj, dataset, drop_variables, num_bands)
 
         # Spatial coords and CRS for both layouts
         ds = ds.assign_coords(xr.Coordinates.from_xindex(index))
@@ -676,7 +711,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             ds.encoding["gdal_driver"] = driver_name
         return ds
 
-    def _raster_as_band_dim(self, filename_or_obj, dataset, chunks, drop_variables, num_bands):
+    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands):
         """Bands collapsed into a single ``band`` dimension on ``band_data``."""
         band_indices = list(range(1, num_bands + 1))
         descriptions = []
@@ -691,28 +726,16 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             offsets.append(band.GetOffset() if band.GetOffset() is not None else 0.0)
 
         backend_array = GDALMultiBandArray(filename_or_obj, band_indices)
+        data = indexing.LazilyIndexedArray(backend_array)
 
-        if chunks is not None:
-            if chunks == {}:
-                block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
-                y_chunk = block_size[1] if block_size[1] > 0 else dataset.RasterYSize
-                x_chunk = block_size[0] if block_size[0] > 0 else dataset.RasterXSize
-                chunk_tuple = (1, y_chunk, x_chunk)
-                logger.debug("multiband chunks (band, y, x)=%s", chunk_tuple)
-            else:
-                chunk_tuple = (
-                    chunks.get("band", 1),
-                    chunks.get("y", -1),
-                    chunks.get("x", -1),
-                )
-            data = da.from_array(
-                backend_array,
-                chunks=chunk_tuple,
-                name=f"gdal-multiband-{filename_or_obj}",
-                asarray=False,
-            )
-        else:
-            data = indexing.LazilyIndexedArray(backend_array)
+        # Native block sizes for chunks={} (band chunk of 1 matches GDAL's
+        # per-band block model); consumed by _maybe_chunk_dataset.
+        block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
+        preferred_chunks = {
+            "band": 1,
+            "y": block_size[1] if block_size[1] > 0 else dataset.RasterYSize,
+            "x": block_size[0] if block_size[0] > 0 else dataset.RasterXSize,
+        }
 
         attrs = {"descriptions": descriptions}
         coords = {"band": np.array(band_indices)}
@@ -753,6 +776,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             attrs=attrs,
             name="band_data",
         )
+        da_obj.encoding["preferred_chunks"] = preferred_chunks
 
         if drop_variables and "band_data" in drop_variables:
             return xr.Dataset()
@@ -761,7 +785,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds = xr.decode_cf(ds, decode_times=False)
         return ds
 
-    def _raster_as_vars(self, filename_or_obj, dataset, chunks, drop_variables, num_bands):
+    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands):
         """Each band as a separate (y, x) data variable."""
         data_vars = {}
 
@@ -774,24 +798,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
             backend_array = GDALBackendArray(filename_or_obj, band_idx)
             logger.debug("band: %i", band_idx)
+            data = indexing.LazilyIndexedArray(backend_array)
 
-            if chunks is not None:
-                if chunks == {}:
-                    block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
-                    y_chunk = block_size[1] if block_size[1] > 0 else dataset.RasterYSize
-                    x_chunk = block_size[0] if block_size[0] > 0 else dataset.RasterXSize
-                    chunk_tuple = (y_chunk, x_chunk)
-                    logger.debug("shape=(y,x), chunks=(y,x)=%s", chunk_tuple)
-                else:
-                    chunk_tuple = (chunks.get("y", -1), chunks.get("x", -1))
-                data = da.from_array(
-                    backend_array,
-                    chunks=chunk_tuple,
-                    name=f"gdal-{filename_or_obj}-{band_name}",
-                    asarray=False,
-                )
-            else:
-                data = indexing.LazilyIndexedArray(backend_array)
+            block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
+            preferred_chunks = {
+                "y": block_size[1] if block_size[1] > 0 else dataset.RasterYSize,
+                "x": block_size[0] if block_size[0] > 0 else dataset.RasterXSize,
+            }
 
             band_attrs = {
                 "_FillValue": band.GetNoDataValue(),
@@ -801,6 +814,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             band_attrs = {k: v for k, v in band_attrs.items() if v is not None}
 
             data_vars[band_name] = xr.DataArray(data, dims=["y", "x"], attrs=band_attrs)
+            data_vars[band_name].encoding["preferred_chunks"] = preferred_chunks
 
         ds = xr.Dataset(data_vars)
         ds = xr.decode_cf(ds, decode_times=False)
@@ -810,7 +824,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Multidim path
     # ------------------------------------------------------------------
 
-    def _open_multidim(self, filename_or_obj, chunks, group, drop_variables):
+    def _open_multidim(self, filename_or_obj, group, drop_variables):
         """Open using GDAL's multidimensional API."""
         dataset = gdal.OpenEx(filename_or_obj, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly)
         if dataset is None:
@@ -856,24 +870,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             backend_array = GDALMultiDimArray(
                 mdarray, _parent_dataset=dataset, _parent_group=target_group
             )
+            data = indexing.LazilyIndexedArray(backend_array)
 
-            if chunks is not None:
-                if chunks == {}:
-                    block_size = mdarray.GetBlockSize()
-                    dim_sizes = [dim.GetSize() for dim in dims]
-                    chunk_tuple = tuple(
-                        b if b > 0 else dim_sizes[i] for i, b in enumerate(block_size)
-                    )
-                else:
-                    chunk_tuple = tuple(chunks.get(dim_name, -1) for dim_name in dim_names)
-                data = da.from_array(
-                    backend_array,
-                    chunks=chunk_tuple,
-                    name=f"gdal-multidim-{filename_or_obj}-{array_name}",
-                    asarray=False,
-                )
-            else:
-                data = indexing.LazilyIndexedArray(backend_array)
+            # Native block sizes for chunks={}; consumed by
+            # _maybe_chunk_dataset. Zero entries mean "whole dimension".
+            block_size = mdarray.GetBlockSize()
+            preferred_chunks = {
+                dim_names[i]: (int(b) if b > 0 else dims[i].GetSize())
+                for i, b in enumerate(block_size)
+            }
 
             attrs = {}
             for attr in mdarray.GetAttributes():
@@ -911,6 +916,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 coords[array_name] = xr.DataArray(coord_data, dims=dim_names, attrs=attrs)
             else:
                 data_vars[array_name] = xr.DataArray(data, dims=dim_names, attrs=attrs)
+                data_vars[array_name].encoding["preferred_chunks"] = preferred_chunks
                 # Create simple index coordinate for any dimension without one
                 for dim, dim_name in zip(dims, dim_names, strict=False):
                     if dim_name not in coords and dim_name not in data_vars:
