@@ -13,6 +13,7 @@ dispatches to one of two open paths depending on the ``multidim`` flag.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 
 import dask.array as da
@@ -38,6 +39,22 @@ def _is_time_coord(array_name: str, attrs: dict, units: str | None) -> bool:
     if array_name.lower() == "time":
         return True
     return bool(units and " since " in units)
+
+
+def _expand_tilde(dsn):
+    """Expand a leading ``~`` in a plain filesystem path (issue #33).
+
+    GDAL does not perform tilde expansion, so ``~/file.tif`` fails with a
+    misleading "not recognized as a supported file format" error. Only
+    ``os.path.expanduser`` is applied, and only when the string starts with
+    ``~``: running ``abspath``/``normpath`` here (as xarray's
+    ``_normalize_path`` does) would corrupt GDAL URIs such as
+    ``/vsicurl/https://...`` by collapsing the double slash, and would
+    mangle ``ZARR:``/``NETCDF:`` connection strings.
+    """
+    if isinstance(dsn, str) and dsn.startswith("~"):
+        return os.path.expanduser(dsn)
+    return dsn
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +161,11 @@ class GDALBackendArray(BackendArray):
             y_stop = y_idx.stop if y_idx.stop is not None else self.shape[0]
             y_step = y_idx.step if y_idx.step is not None else 1
             if y_step > 0 and y_stop < y_start:
-                y_start, y_stop = y_stop, y_start + 1
+                # Empty under Python slice semantics (issue #32): pandas
+                # emits e.g. slice(3, 0) for an empty label selection on a
+                # descending coordinate. A reverse read is expressed as
+                # step < 0, never as stop < start with a positive step.
+                y_start = y_stop = 0
             elif y_step < 0:
                 y_start, y_stop, y_step = y_stop + 1, y_start + 1, -y_step
             y_size = y_stop - y_start
@@ -160,14 +181,16 @@ class GDALBackendArray(BackendArray):
             x_stop = x_idx.stop if x_idx.stop is not None else self.shape[1]
             x_step = x_idx.step if x_idx.step is not None else 1
             if x_step > 0 and x_stop < x_start:
-                x_start, x_stop = x_stop, x_start + 1
+                # Empty selection, see y indexer above (issue #32)
+                x_start = x_stop = 0
             elif x_step < 0:
                 x_start, x_stop, x_step = x_stop + 1, x_start + 1, -x_step
             x_size = x_stop - x_start
         else:
             raise IndexError(f"Unsupported x index type: {type(x_idx)}")
 
-        # Zero-sized slice (Dask uses these for _meta)
+        # Zero-sized read: emitted by Dask for _meta inference and by
+        # empty label selections normalised above (issue #32)
         if y_size == 0 or x_size == 0:
             shape = []
             if not squeeze_y:
@@ -286,7 +309,11 @@ class GDALMultiBandArray(BackendArray):
             b_stop = b_idx.stop if b_idx.stop is not None else self._shape[0]
             b_step = b_idx.step if b_idx.step is not None else 1
             if b_step > 0 and b_stop < b_start:
-                b_start, b_stop = b_stop, b_start + 1
+                # Empty under Python slice semantics (issue #32): pandas
+                # emits e.g. slice(3, 0) for an empty label selection on a
+                # descending coordinate. A reverse read is expressed as
+                # step < 0, never as stop < start with a positive step.
+                b_start = b_stop = 0
             elif b_step < 0:
                 b_start, b_stop, b_step = b_stop + 1, b_start + 1, -b_step
             band_list = [self.band_indices[i] for i in range(b_start, b_stop, b_step)]
@@ -304,7 +331,8 @@ class GDALMultiBandArray(BackendArray):
             y_stop = y_idx.stop if y_idx.stop is not None else self._shape[1]
             y_step = y_idx.step if y_idx.step is not None else 1
             if y_step > 0 and y_stop < y_start:
-                y_start, y_stop = y_stop, y_start + 1
+                # Empty selection, see band indexer above (issue #32)
+                y_start = y_stop = 0
             elif y_step < 0:
                 y_start, y_stop, y_step = y_stop + 1, y_start + 1, -y_step
             y_size = y_stop - y_start
@@ -320,7 +348,8 @@ class GDALMultiBandArray(BackendArray):
             x_stop = x_idx.stop if x_idx.stop is not None else self._shape[2]
             x_step = x_idx.step if x_idx.step is not None else 1
             if x_step > 0 and x_stop < x_start:
-                x_start, x_stop = x_stop, x_start + 1
+                # Empty selection, see band indexer above (issue #32)
+                x_start = x_stop = 0
             elif x_step < 0:
                 x_start, x_stop, x_step = x_stop + 1, x_start + 1, -x_step
             x_size = x_stop - x_start
@@ -446,9 +475,13 @@ class GDALMultiDimArray(BackendArray):
                 stop = k.stop if k.stop is not None else self.shape[i]
                 step = k.step if k.step is not None else 1
                 if step > 0 and stop < start:
-                    # xarray canonicalises reverse-slice on decreasing coords as
-                    # slice(stop<start) - read forward, let xarray flip display
-                    start, stop = stop, start + 1
+                    # Empty under Python slice semantics (issue #32): pandas
+                    # emits e.g. slice(3, 0) for an empty label selection on
+                    # a descending coordinate. A reverse read is expressed
+                    # as step < 0, never as stop < start with a positive
+                    # step. The previous "flip and read forward" here turned
+                    # empty selections into out-of-bounds ReadAsArray calls.
+                    start = stop = 0
                 elif step < 0:
                     start, stop, step = stop + 1, start + 1, -step
                 count = (stop - start + step - 1) // step
@@ -464,7 +497,8 @@ class GDALMultiDimArray(BackendArray):
             counts.append(count)
             steps.append(step)
 
-        # Zero-sized slice (Dask uses these for _meta inference)
+        # Zero-sized read: emitted by Dask for _meta inference and by
+        # empty label selections normalised above (issue #32)
         if any(c == 0 for c in counts):
             shape = [c for i, c in enumerate(counts) if i not in squeeze_dims]
             return np.empty(shape, dtype=self._dtype)
@@ -578,6 +612,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             default suits multispectral imagery; False is preferable when
             bands carry semantically distinct quantities.
         """
+        filename_or_obj = _expand_tilde(filename_or_obj)
         if multidim:
             return self._open_multidim(filename_or_obj, chunks, group, drop_variables)
         return self._open_raster(filename_or_obj, chunks, drop_variables, band_as_dim=band_as_dim)
@@ -910,7 +945,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         if not isinstance(filename_or_obj, str):
             return False
         try:
-            ds = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
+            ds = gdal.Open(_expand_tilde(filename_or_obj), gdal.GA_ReadOnly)
         except Exception:
             return False
         if ds is None:

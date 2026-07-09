@@ -21,6 +21,8 @@ import warnings
 
 from osgeo import gdal
 
+from .backend import _expand_tilde
+
 # Options that gdal.Warp accepts but that do not affect the data and
 # do not survive into the serialised VRT. Passing these to warp() with
 # format="VRT" is a no-op; we warn so users aren't misled.
@@ -193,6 +195,8 @@ def warp(
     # Force VRT output — this is what makes the result a recipe.
     kwargs["format"] = "VRT"
 
+    if isinstance(source, str):
+        source = _expand_tilde(source)
     wds = gdal.Warp(destNameOrDestDS="", srcDSOrSrcDSTab=source, **kwargs)
     if wds is None:
         raise ValueError(f"gdal.Warp failed for {source!r}")

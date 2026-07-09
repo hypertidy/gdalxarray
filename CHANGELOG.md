@@ -21,6 +21,10 @@
   `ds.encoding["_FillValue"]` after decoding (or in `ds.attrs[...]`
   before decoding if `mask_and_scale=False` is passed).
 
+- Expand leading tilde paths, fixes #32. 
+
+- Return empty arrry for zero count reads, fixes #33. 
+
 ## [0.4.0] - 2026-06-16
 
 ### Added
