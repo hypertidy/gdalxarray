@@ -55,7 +55,13 @@ def test_classic_empty_label_sel_descending_y(backend, descending_tif, band_as_d
     for var in sel.data_vars:
         vals = sel[var].values
         assert vals.shape[sel[var].dims.index("y")] == 0
-    sel.to_dataframe()  # must not raise (issue #32 trigger)
+    # The classic path attaches a rasterix RasterIndex to x/y, which does
+    # not implement to_pandas_index, so plain to_dataframe raises TypeError
+    # for ANY selection (empty or not) -- that is a rasterix limitation,
+    # not issue #32. Drop the raster index first; xarray then falls back
+    # to RangeIndex per dim. The direct #32 to_dataframe trigger is
+    # exercised on the multidim path below, which has pandas indexes.
+    sel.drop_indexes(["x", "y"]).to_dataframe()  # must not raise
 
 
 @pytest.mark.parametrize("band_as_dim", [True, False])
