@@ -58,6 +58,37 @@ def _expand_tilde(dsn):
     return dsn
 
 
+def _axis_read_plan(key, size):
+    """Plan a contiguous 1-D GDAL read for an int or slice key.
+
+    Returns ``(read_start, read_count, rel_index, out_len, squeeze)``.
+    Classic-raster reads have no stride, so stepped or reversed slices
+    read the smallest contiguous covering window and reorder afterwards
+    with ``rel_index`` (positions relative to ``read_start``, in output
+    order); ``rel_index`` is None for ascending step-1 slices.
+    ``read_count == 0`` marks an empty selection (issue #32) that must
+    never reach GDAL. Negative ints and slice bounds follow Python
+    semantics via ``slice.indices``.
+    """
+    if isinstance(key, (int, np.integer)):
+        k = int(key)
+        if k < 0:
+            k += size
+        if not 0 <= k < size:
+            raise IndexError(f"index {key} out of bounds for axis of size {size}")
+        return k, 1, None, 1, True
+    if isinstance(key, slice):
+        idx = np.arange(*key.indices(size))
+        n = int(idx.size)
+        if n == 0:
+            return 0, 0, None, 0, False
+        step = key.step if key.step is not None else 1
+        if step == 1:
+            return int(idx[0]), n, None, n, False
+        lo = int(idx.min())
+        return lo, int(idx.max()) - lo + 1, idx - lo, n, False
+    raise IndexError(f"Unsupported index type: {type(key)}")
+
 # ---------------------------------------------------------------------------
 # Classic-raster, single band
 # ---------------------------------------------------------------------------
@@ -125,89 +156,58 @@ class GDALBackendArray(BackendArray):
         return int(np.prod(self._shape))
 
     def __getitem__(self, key):
-        logger.debug("backend __getitem__ key type=%s key=%r", type(key).__name__, key)
-
-        from xarray.core import indexing as xr_indexing
-
-        if isinstance(
-            key, (xr_indexing.BasicIndexer, xr_indexing.OuterIndexer, xr_indexing.VectorizedIndexer)
-        ):
-            key = key.tuple
-
-        if isinstance(key, tuple):
-            return self._raw_indexing_method(key)
-        else:
-            return self._raw_indexing_method((key,))
-
+        # xarray decomposes outer/vectorized indexers (integer or boolean
+        # arrays, e.g. isel(time=ds.time.dt.month == 6)) into a covering
+        # BASIC read here plus an in-memory numpy step on its side.
+        # Raw int/slice keys (direct use outside xarray's lazy wrappers)
+        # are wrapped as BasicIndexer for backward compatibility.
+        if not isinstance(key, indexing.ExplicitIndexer):
+            key = indexing.BasicIndexer(key if isinstance(key, tuple) else (key,))
+        return indexing.explicit_indexing_adapter(
+            key,
+            self.shape,
+            indexing.IndexingSupport.BASIC,
+            self._raw_indexing_method,
+        )
     def _raw_indexing_method(self, key):
-        """Read data from GDAL using basic indexing."""
+        """Read (y, x) from a tuple of ints and slices.
+
+        Stepped and reversed slices read the smallest contiguous
+        covering window (band reads have no stride) and reorder in
+        numpy via the plan's relative index.
+        """
         if not isinstance(key, tuple):
             key = (key,)
-
-        # Pad to 2D
         if len(key) < 2:
             key = key + (slice(None),) * (2 - len(key))
         if len(key) > 2:
             raise IndexError(f"Expected at most 2D index, got {len(key)}D")
 
-        y_idx, x_idx = key
-        squeeze_y = squeeze_x = False
-
-        # y indexer
-        if isinstance(y_idx, (int, np.integer)):
-            y_start, y_size = int(y_idx), 1
-            squeeze_y = True
-        elif isinstance(y_idx, slice):
-            y_start = y_idx.start if y_idx.start is not None else 0
-            y_stop = y_idx.stop if y_idx.stop is not None else self.shape[0]
-            y_step = y_idx.step if y_idx.step is not None else 1
-            if y_step > 0 and y_stop < y_start:
-                # Empty under Python slice semantics (issue #32): pandas
-                # emits e.g. slice(3, 0) for an empty label selection on a
-                # descending coordinate. A reverse read is expressed as
-                # step < 0, never as stop < start with a positive step.
-                y_start = y_stop = 0
-            elif y_step < 0:
-                y_start, y_stop, y_step = y_stop + 1, y_start + 1, -y_step
-            y_size = y_stop - y_start
-        else:
-            raise IndexError(f"Unsupported y index type: {type(y_idx)}")
-
-        # x indexer
-        if isinstance(x_idx, (int, np.integer)):
-            x_start, x_size = int(x_idx), 1
-            squeeze_x = True
-        elif isinstance(x_idx, slice):
-            x_start = x_idx.start if x_idx.start is not None else 0
-            x_stop = x_idx.stop if x_idx.stop is not None else self.shape[1]
-            x_step = x_idx.step if x_idx.step is not None else 1
-            if x_step > 0 and x_stop < x_start:
-                # Empty selection, see y indexer above (issue #32)
-                x_start = x_stop = 0
-            elif x_step < 0:
-                x_start, x_stop, x_step = x_stop + 1, x_start + 1, -x_step
-            x_size = x_stop - x_start
-        else:
-            raise IndexError(f"Unsupported x index type: {type(x_idx)}")
+        y0, ny, y_rel, y_len, squeeze_y = _axis_read_plan(key[0], self.shape[0])
+        x0, nx, x_rel, x_len, squeeze_x = _axis_read_plan(key[1], self.shape[1])
 
         # Zero-sized read: emitted by Dask for _meta inference and by
-        # empty label selections normalised above (issue #32)
-        if y_size == 0 or x_size == 0:
+        # empty label selections (issue #32); never reaches GDAL
+        if ny == 0 or nx == 0:
             shape = []
             if not squeeze_y:
-                shape.append(y_size)
+                shape.append(y_len)
             if not squeeze_x:
-                shape.append(x_size)
+                shape.append(x_len)
             return np.empty(shape, dtype=self._dtype)
 
         band = self._get_band()
-        logger.debug("read: yoff=%s xoff=%s ysize=%s xsize=%s", y_start, x_start, y_size, x_size)
+        logger.debug("read: yoff=%s xoff=%s ysize=%s xsize=%s", y0, x0, ny, nx)
         data = band.ReadAsArray(
-            xoff=x_start,
-            yoff=y_start,
-            win_xsize=x_size,
-            win_ysize=y_size,
+            xoff=x0,
+            yoff=y0,
+            win_xsize=nx,
+            win_ysize=ny,
         )
+        if y_rel is not None:
+            data = data[y_rel, :]
+        if x_rel is not None:
+            data = data[:, x_rel]
 
         if squeeze_y and squeeze_x:
             return data[0, 0]
@@ -216,8 +216,6 @@ class GDALBackendArray(BackendArray):
         if squeeze_x:
             return data[:, 0]
         return data
-
-
 # ---------------------------------------------------------------------------
 # Classic-raster, all bands as one (band, y, x) array
 # ---------------------------------------------------------------------------
@@ -277,117 +275,99 @@ class GDALMultiBandArray(BackendArray):
         return int(np.prod(self._shape))
 
     def __getitem__(self, key):
-        logger.debug("multiband __getitem__ key type=%s key=%r", type(key).__name__, key)
-
-        from xarray.core import indexing as xr_indexing
-
-        if isinstance(
-            key, (xr_indexing.BasicIndexer, xr_indexing.OuterIndexer, xr_indexing.VectorizedIndexer)
-        ):
-            key = key.tuple
-
-        if isinstance(key, tuple):
-            return self._raw_indexing_method(key)
-        else:
-            return self._raw_indexing_method((key,))
-
+        # xarray decomposes outer/vectorized indexers (integer or boolean
+        # arrays, e.g. isel(time=ds.time.dt.month == 6)) into a covering
+        # BASIC read here plus an in-memory numpy step on its side.
+        # Raw int/slice keys (direct use outside xarray's lazy wrappers)
+        # are wrapped as BasicIndexer for backward compatibility.
+        if not isinstance(key, indexing.ExplicitIndexer):
+            key = indexing.BasicIndexer(key if isinstance(key, tuple) else (key,))
+        return indexing.explicit_indexing_adapter(
+            key,
+            self.shape,
+            indexing.IndexingSupport.BASIC,
+            self._raw_indexing_method,
+        )
     def _raw_indexing_method(self, key):
-        """Read via ``dataset.ReadAsArray`` with an explicit band_list."""
+        """Read via ``dataset.ReadAsArray`` with an explicit band_list.
+
+        The band dimension supports arbitrary order natively (GDAL
+        honours band_list order, so reversed or stepped band slices and
+        integer-array band keys need no post-processing); y/x use
+        covering-window reads with a numpy reorder for stepped or
+        reversed slices.
+        """
+        if not isinstance(key, tuple):
+            key = (key,)
         if len(key) < 3:
             key = key + (slice(None),) * (3 - len(key))
         if len(key) > 3:
             raise IndexError(f"Expected at most 3D index, got {len(key)}D")
 
         b_idx, y_idx, x_idx = key
-        squeeze_b = squeeze_y = squeeze_x = False
+        nbands = len(self.band_indices)
+        squeeze_b = False
 
-        # band indexer -> list of 1-based GDAL band numbers
         if isinstance(b_idx, (int, np.integer)):
-            band_list = [self.band_indices[int(b_idx)]]
+            b = int(b_idx)
+            if b < 0:
+                b += nbands
+            if not 0 <= b < nbands:
+                raise IndexError(
+                    f"band index {b_idx} out of bounds for {nbands} bands"
+                )
+            positions = [b]
             squeeze_b = True
         elif isinstance(b_idx, slice):
-            b_start = b_idx.start if b_idx.start is not None else 0
-            b_stop = b_idx.stop if b_idx.stop is not None else self._shape[0]
-            b_step = b_idx.step if b_idx.step is not None else 1
-            if b_step > 0 and b_stop < b_start:
-                # Empty under Python slice semantics (issue #32): pandas
-                # emits e.g. slice(3, 0) for an empty label selection on a
-                # descending coordinate. A reverse read is expressed as
-                # step < 0, never as stop < start with a positive step.
-                b_start = b_stop = 0
-            elif b_step < 0:
-                b_start, b_stop, b_step = b_stop + 1, b_start + 1, -b_step
-            band_list = [self.band_indices[i] for i in range(b_start, b_stop, b_step)]
+            positions = list(range(*b_idx.indices(nbands)))
         elif isinstance(b_idx, (list, np.ndarray)):
-            band_list = [self.band_indices[int(i)] for i in b_idx]
+            positions = [
+                int(i) + nbands if int(i) < 0 else int(i) for i in b_idx
+            ]
         else:
             raise IndexError(f"Unsupported band index type: {type(b_idx)}")
+        band_list = [self.band_indices[i] for i in positions]
 
-        # y indexer
-        if isinstance(y_idx, (int, np.integer)):
-            y_start, y_size = int(y_idx), 1
-            squeeze_y = True
-        elif isinstance(y_idx, slice):
-            y_start = y_idx.start if y_idx.start is not None else 0
-            y_stop = y_idx.stop if y_idx.stop is not None else self._shape[1]
-            y_step = y_idx.step if y_idx.step is not None else 1
-            if y_step > 0 and y_stop < y_start:
-                # Empty selection, see band indexer above (issue #32)
-                y_start = y_stop = 0
-            elif y_step < 0:
-                y_start, y_stop, y_step = y_stop + 1, y_start + 1, -y_step
-            y_size = y_stop - y_start
-        else:
-            raise IndexError(f"Unsupported y index type: {type(y_idx)}")
+        y0, ny, y_rel, y_len, squeeze_y = _axis_read_plan(y_idx, self._shape[1])
+        x0, nx, x_rel, x_len, squeeze_x = _axis_read_plan(x_idx, self._shape[2])
 
-        # x indexer
-        if isinstance(x_idx, (int, np.integer)):
-            x_start, x_size = int(x_idx), 1
-            squeeze_x = True
-        elif isinstance(x_idx, slice):
-            x_start = x_idx.start if x_idx.start is not None else 0
-            x_stop = x_idx.stop if x_idx.stop is not None else self._shape[2]
-            x_step = x_idx.step if x_idx.step is not None else 1
-            if x_step > 0 and x_stop < x_start:
-                # Empty selection, see band indexer above (issue #32)
-                x_start = x_stop = 0
-            elif x_step < 0:
-                x_start, x_stop, x_step = x_stop + 1, x_start + 1, -x_step
-            x_size = x_stop - x_start
-        else:
-            raise IndexError(f"Unsupported x index type: {type(x_idx)}")
-
-        if y_size == 0 or x_size == 0 or len(band_list) == 0:
+        # Zero-sized read: emitted by Dask for _meta inference and by
+        # empty label selections (issue #32); never reaches GDAL
+        if ny == 0 or nx == 0 or len(band_list) == 0:
             shape = []
             if not squeeze_b:
                 shape.append(len(band_list))
             if not squeeze_y:
-                shape.append(y_size)
+                shape.append(y_len)
             if not squeeze_x:
-                shape.append(x_size)
+                shape.append(x_len)
             return np.empty(shape, dtype=self._dtype)
 
         ds = self._get_dataset()
         logger.debug(
-            "multiband read: bands=%s yoff=%s xoff=%s ysize=%s xsize=%s",
+            "read: bands=%s yoff=%s xoff=%s ysize=%s xsize=%s",
             band_list,
-            y_start,
-            x_start,
-            y_size,
-            x_size,
+            y0,
+            x0,
+            ny,
+            nx,
         )
-
         data = ds.ReadAsArray(
-            xoff=x_start,
-            yoff=y_start,
-            xsize=x_size,
-            ysize=y_size,
+            xoff=x0,
+            yoff=y0,
+            xsize=nx,
+            ysize=ny,
             band_list=band_list,
         )
 
         # ReadAsArray returns 2D for a single band, 3D for multiple - normalise
         if data.ndim == 2:
             data = data[np.newaxis, :, :]
+
+        if y_rel is not None:
+            data = data[:, y_rel, :]
+        if x_rel is not None:
+            data = data[:, :, x_rel]
 
         axes_to_squeeze = []
         if squeeze_b:
@@ -398,10 +378,7 @@ class GDALMultiBandArray(BackendArray):
             axes_to_squeeze.append(2)
         if axes_to_squeeze:
             data = np.squeeze(data, axis=tuple(axes_to_squeeze))
-
         return data
-
-
 # ---------------------------------------------------------------------------
 # Multidim
 # ---------------------------------------------------------------------------
@@ -410,15 +387,32 @@ class GDALMultiBandArray(BackendArray):
 class GDALMultiDimArray(BackendArray):
     """Wrap a GDAL MDArray as an N-D xarray BackendArray.
 
-    Holds optional references to the parent dataset and group so that the
-    underlying ``mdarray`` remains valid even after the open-time variables
+    Thread safety (issue #34): GDAL handles are not thread-safe
+    per-handle, but GDAL is thread-safe across handles (drivers such as
+    netCDF/HDF5 take their own global locks internally). Reads therefore
+    go through a per-thread handle resolved lazily in ``_get_mdarray``,
+    mirroring ``GDALBackendArray._get_band``: each dask worker thread
+    reopens the store once and reuses its own handle, and since osgeo
+    releases the GIL during I/O those reads genuinely parallelize.
+
+    The constructing thread is seeded with the already-open handle, so
+    the non-dask path pays no reopen cost. Parent dataset/group
+    references keep that seed handle valid after the open-time variables
     drop out of scope (a multidim MDArray is a view into its parent).
+
+    Instances pickle by dropping live handles and thread-locals; the
+    unpickling side reopens from ``filename``/``fullname`` on first
+    read, which makes the class usable under distributed schedulers.
     """
 
-    def __init__(self, mdarray, _parent_dataset=None, _parent_group=None):
-        self.mdarray = mdarray
-        # Keep parent objects alive - without these refs the mdarray can be
-        # invalidated when the user-facing ds goes out of scope mid-session.
+    def __init__(self, mdarray, filename=None, _parent_dataset=None, _parent_group=None):
+        self._filename = filename
+        self._fullname = mdarray.GetFullName()  # e.g. "/group/array"
+        self._local = threading.local()
+        # Seed this thread with the open handle (no reopen on first read).
+        self._local.mdarray = mdarray
+        # Keep parent objects alive - without these refs the seed mdarray
+        # can be invalidated when the user-facing ds goes out of scope.
         self._parent_dataset = _parent_dataset
         self._parent_group = _parent_group
 
@@ -429,6 +423,45 @@ class GDALMultiDimArray(BackendArray):
         self._dtype = GDALBackendArray._gdal_to_numpy_dtype(gdal_dtype)
         self._chunks = tuple(mdarray.GetBlockSize())
 
+    def _get_mdarray(self):
+        """Per-thread MDArray handle, reopened lazily off-thread."""
+        if not hasattr(self._local, "mdarray"):
+            if self._filename is None:
+                raise RuntimeError(
+                    "GDALMultiDimArray was constructed without a filename; "
+                    "reads from other threads or after unpickling need one "
+                    "to reopen the store (issue #34)"
+                )
+            ds = gdal.OpenEx(
+                self._filename, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly
+            )
+            if ds is None:
+                raise ValueError(f"Could not reopen {self._filename}")
+            root = ds.GetRootGroup()
+            md = root.OpenMDArrayFromFullname(self._fullname)
+            if md is None:
+                raise ValueError(
+                    f"Could not open array {self._fullname!r} in {self._filename}"
+                )
+            # Keep the whole chain alive for this thread's lifetime.
+            self._local.ds = ds
+            self._local.root = root
+            self._local.mdarray = md
+        return self._local.mdarray
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Live GDAL handles and thread-locals are not picklable; the
+        # receiving side reopens from filename/fullname on first read.
+        state["_local"] = None
+        state["_parent_dataset"] = None
+        state["_parent_group"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._local = threading.local()
+
     @property
     def shape(self):
         return self._shape
@@ -438,28 +471,31 @@ class GDALMultiDimArray(BackendArray):
         return np.dtype(self._dtype)
 
     def __dask_tokenize__(self):
+        # Strings only: tokenize can be called from any thread, so it
+        # must never touch a live GDAL handle (issue #34).
         return (
             type(self).__name__,
-            self.mdarray.GetFullName(),  # e.g. "/wind_v_10m" — stable within the store
+            self._filename,
+            self._fullname,
             self._shape,
             str(self._dtype),
             self._chunks,
         )
 
     def __getitem__(self, key):
-        logger.debug("multidim __getitem__ key type=%s key=%r", type(key).__name__, key)
-
-        from xarray.core import indexing as xr_indexing
-
-        if isinstance(
-            key, (xr_indexing.BasicIndexer, xr_indexing.OuterIndexer, xr_indexing.VectorizedIndexer)
-        ):
-            key = key.tuple
-
-        if not isinstance(key, tuple):
-            key = (key,)
-        return self._raw_indexing_method(key)
-
+        # xarray decomposes outer/vectorized indexers (integer or boolean
+        # arrays, e.g. isel(time=ds.time.dt.month == 6)) into a covering
+        # BASIC read here plus an in-memory numpy step on its side.
+        # Raw int/slice keys (direct use outside xarray's lazy wrappers)
+        # are wrapped as BasicIndexer for backward compatibility.
+        if not isinstance(key, indexing.ExplicitIndexer):
+            key = indexing.BasicIndexer(key if isinstance(key, tuple) else (key,))
+        return indexing.explicit_indexing_adapter(
+            key,
+            self.shape,
+            indexing.IndexingSupport.BASIC,
+            self._raw_indexing_method,
+        )
     def _raw_indexing_method(self, key):
         """Read data from GDAL multidim array."""
         if not isinstance(key, tuple):
@@ -470,24 +506,30 @@ class GDALMultiDimArray(BackendArray):
         steps = []
         squeeze_dims = []
 
+        flip_axes = []
         for i, k in enumerate(key):
             if isinstance(k, slice):
-                start = k.start if k.start is not None else 0
-                stop = k.stop if k.stop is not None else self.shape[i]
-                step = k.step if k.step is not None else 1
-                if step > 0 and stop < start:
-                    # Empty under Python slice semantics (issue #32): pandas
-                    # emits e.g. slice(3, 0) for an empty label selection on
-                    # a descending coordinate. A reverse read is expressed
-                    # as step < 0, never as stop < start with a positive
-                    # step. The previous "flip and read forward" here turned
-                    # empty selections into out-of-bounds ReadAsArray calls.
-                    start = stop = 0
-                elif step < 0:
-                    start, stop, step = stop + 1, start + 1, -step
-                count = (stop - start + step - 1) // step
+                # slice.indices gives Python slice semantics: clamped
+                # bounds, and empty ranges (count 0) for e.g. the
+                # slice(3, 0) pandas emits for an empty label selection
+                # on a descending coordinate (issue #32).
+                start, stop, step = k.indices(self.shape[i])
+                count = len(range(start, stop, step))
+                if count and step < 0:
+                    # MDArray strided reads ascend: read the same index
+                    # set forward and flip this axis after the read.
+                    start = start + (count - 1) * step
+                    step = -step
+                    flip_axes.append(i)
             elif isinstance(k, (int, float, np.integer, np.floating)):
                 start = int(k)
+                if start < 0:
+                    start += self.shape[i]
+                if not 0 <= start < self.shape[i]:
+                    raise IndexError(
+                        f"index {k} out of bounds for dimension {i} "
+                        f"of size {self.shape[i]}"
+                    )
                 count = 1
                 step = 1
                 squeeze_dims.append(i)
@@ -504,10 +546,14 @@ class GDALMultiDimArray(BackendArray):
             shape = [c for i, c in enumerate(counts) if i not in squeeze_dims]
             return np.empty(shape, dtype=self._dtype)
 
+        # Resolve the per-thread handle once per read (issue #34): every
+        # GDAL call below must go through it, never a shared handle.
+        mdarray = self._get_mdarray()
+
         # AdviseRead is a prefetch hint. Compute a reasonable CACHE_SIZE for it,
         # bounded above to avoid GDAL choking on absurd values when sharded
         # stores report a shard-sized block (see #issue-AdviseRead-cache).
-        block = np.array(self.mdarray.GetBlockSize())
+        block = np.array(mdarray.GetBlockSize())
         for i in range(len(block)):
             if block[i] == 0:
                 block[i] = self.shape[i]
@@ -520,7 +566,7 @@ class GDALMultiDimArray(BackendArray):
         if MIN_BYTES < read_bytes < MAX_BYTES:
             cache_size = min(int(read_bytes * 1.2), MAX_BYTES)
             try:
-                self.mdarray.AdviseRead(
+                mdarray.AdviseRead(
                     array_start_idx=starts,
                     count=counts,
                     options=[f"CACHE_SIZE={cache_size}"],
@@ -537,11 +583,14 @@ class GDALMultiDimArray(BackendArray):
             self._chunks,
         )
 
-        data = self.mdarray.ReadAsArray(
+        data = mdarray.ReadAsArray(
             array_start_idx=starts,
             count=counts,
             array_step=steps,
         )
+
+        for ax in flip_axes:
+            data = np.flip(data, axis=ax)
 
         # Squeeze out integer-indexed dimensions
         for dim_idx in reversed(squeeze_dims):
@@ -919,7 +968,10 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             # Backend array holds refs to parent dataset/group so the mdarray
             # stays valid for the lifetime of the resulting xarray Dataset.
             backend_array = GDALMultiDimArray(
-                mdarray, _parent_dataset=dataset, _parent_group=target_group
+                mdarray,
+                filename=filename_or_obj,
+                _parent_dataset=dataset,
+                _parent_group=target_group,
             )
             data = indexing.LazilyIndexedArray(backend_array)
 
@@ -957,8 +1009,12 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             is_coord = any(dim.GetName() == array_name for dim in dims)
 
             if is_coord and len(dim_names) == 1:
-                # Load eagerly for index variables
-                coord_data = backend_array[:]
+                # Load eagerly for index variables; go through the raw
+                # method (the adapter __getitem__ expects xarray
+                # ExplicitIndexer keys, not raw slices)
+                coord_data = backend_array._raw_indexing_method(
+                    tuple(slice(None) for _ in backend_array.shape)
+                )
                 units = mdarray.GetUnit()
                 if _is_time_coord(array_name, attrs, units):
                     calendar = attrs.get("calendar", "standard")

@@ -4,6 +4,47 @@
 
 ### Fixed
 
+- Outer and boolean indexers now work on all read paths, and stepped or
+  reversed slices return correct data. Selections built from integer or
+  boolean arrays, e.g.
+  `isel(time=(ds.time.dt.month == 6) & (ds.time.dt.day == 27))`,
+  previously raised
+  `IndexError: Unsupported index type: <class 'numpy.ndarray'>`; the
+  three BackendArray classes now declare `IndexingSupport.BASIC` via
+  xarray's `explicit_indexing_adapter`, which decomposes fancy indexers
+  into a covering basic read plus an in-memory numpy step. At the same
+  time the basic reads themselves were completed: the classic-raster
+  paths previously ignored slice steps entirely (a stepped `isel`
+  returned the wrong shape or wrong rows), every path read
+  negative-step slices forward without reversing the result, and a
+  reversed band slice (`isel(band=slice(None, None, -1))`) silently
+  returned an empty array. Classic paths serve stepped/reversed slices
+  by reading the smallest contiguous covering window and reordering in
+  numpy; the multidim path keeps native strided reads and flips
+  negative-step axes after the read; band lists pass arbitrary order
+  natively. Negative integer indices are also supported everywhere,
+  raw int/slice keys on the backend arrays keep working (wrapped
+  as BasicIndexer), and the eager coordinate load at open time
+  goes through the raw read path.
+  (Empty integer-array indexers remain an upstream xarray limitation:
+  `_decompose_outer_indexer` crashes before backend code runs.)
+
+- The multidim path is now safe under dask's threaded scheduler (#34).
+  `GDALMultiDimArray` previously read through a single shared `mdarray`
+  handle from every dask worker thread; GDAL handles are not
+  thread-safe per-handle, so threaded computes over chunked multidim
+  data were a data race (crash or corruption). Reads now resolve a
+  per-thread handle lazily (`gdal.OpenEx` + `OpenMDArrayFromFullname`
+  per worker thread), the same pattern the classic-raster classes
+  already used: GDAL is thread-safe across handles, drivers take their
+  own global locks internally, and osgeo releases the GIL during I/O,
+  so threaded reads are both safe and genuinely parallel. The
+  constructing thread reuses the already-open handle, so the non-dask
+  path pays no reopen cost. `__dask_tokenize__` no longer touches a
+  live handle (it can be called from any thread), and instances now
+  pickle by dropping handles and reopening on first read, which makes
+  the multidim path usable under distributed schedulers.
+
 - Empty label selections no longer raise or silently return wrong data
   (#32). pandas emits positional slices with stop < start and a positive
   step for an empty label selection on a descending coordinate, e.g.
