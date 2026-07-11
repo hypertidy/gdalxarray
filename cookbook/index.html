@@ -688,7 +688,7 @@ os.environ.setdefault(&quot;CPL_VSIL_CURL_USE_HEAD&quot;, &quot;NO&quot;)
 reproducible in notebooks.</p>
 <h2 id="nci-thredds-rate-limited-https-source">NCI THREDDS (rate-limited HTTPS source)</h2>
 <p>Some institutional servers rate-limit aggressive parallel
-reads. The recipe is to cap  parallelism, we find that 8 is safe for <a href="https://thredds.nci.org.au/">NCI Thredds</a>. </p>
+reads. The recipe is to cap  parallelism, we find that 8 is safe for <a href="https://thredds.nci.org.au/">NCI Thredds</a>.</p>
 <pre><code class="language-python">import dask
 dask.config.set(scheduler='threads', num_workers=8)
 </code></pre>
