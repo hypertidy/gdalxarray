@@ -7,7 +7,7 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 import pytest
-import xarray as xr 
+import xarray as xr
 
 from gdalxarray import GDALBackendEntrypoint
 
@@ -205,6 +205,7 @@ def test_netcdf_classic_lists_subdatasets(backend):
     assert "subdataset" in msg.lower()
     assert "multidim=True" in msg
 
+
 def test_cf_decode_band_as_dim(synthetic_geotiff_with_scale):
     """band_as_dim=True case: decoded float64 with scale/fill applied."""
     ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray", multidim=False)
@@ -215,8 +216,9 @@ def test_cf_decode_band_as_dim(synthetic_geotiff_with_scale):
 
 def test_cf_decode_band_as_vars(synthetic_geotiff_with_scale):
     """band_as_dim=False case: same decoding, per-variable."""
-    ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray",
-                          multidim=False, band_as_dim=False)
+    ds = xr.open_dataset(
+        synthetic_geotiff_with_scale, engine="gdalxarray", multidim=False, band_as_dim=False
+    )
     var_name = list(ds.data_vars)[0]
     assert ds[var_name].dtype == np.float64
     assert ds[var_name].values[50, 50] == pytest.approx(10.0)
@@ -225,6 +227,7 @@ def test_cf_decode_band_as_vars(synthetic_geotiff_with_scale):
 
 def test_cf_scale_and_fillvalue_applied(synthetic_geotiff_with_scale):
     import numpy as np
+
     ds = xr.open_dataset(synthetic_geotiff_with_scale, engine="gdalxarray", multidim=False)
     assert ds.band_data.dtype == np.float64
     # stored 1000 * 0.01 = 10.0

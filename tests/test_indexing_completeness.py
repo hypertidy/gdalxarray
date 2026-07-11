@@ -30,15 +30,15 @@ def _indexer_matrix(sizes):
     third[:: max(1, n0 // 3)] = True
     return [
         {d0: np.array([0, n0 - 1])},
-        {d0: np.array([n0 - 1, 0])},          # unordered
-        {d0: third},                           # boolean
-        {d0: slice(0, n0, 2)},                 # stepped
-        {d0: slice(None, None, -1)},           # reversed
-        {d0: slice(n0 - 1, 0, -2)},            # reversed + stepped
+        {d0: np.array([n0 - 1, 0])},  # unordered
+        {d0: third},  # boolean
+        {d0: slice(0, n0, 2)},  # stepped
+        {d0: slice(None, None, -1)},  # reversed
+        {d0: slice(n0 - 1, 0, -2)},  # reversed + stepped
         {d0: np.array([0, n0 - 1]), d1: slice(0, n1, 2)},
         {d0: 0, d1: np.array([n1 - 1, 0])},
-        {d0: -1},                              # negative int
-        {d0: slice(2, 2)},                     # empty slice
+        {d0: -1},  # negative int
+        {d0: slice(2, 2)},  # empty slice
     ]
 
 
@@ -51,9 +51,7 @@ def _assert_matches(lazy_da, loaded_da):
 
 @pytest.mark.parametrize("band_as_dim", [True, False])
 def test_classic_indexing_matrix(backend, synthetic_geotiff, band_as_dim):
-    ds = backend.open_dataset(
-        synthetic_geotiff, multidim=False, band_as_dim=band_as_dim
-    )
+    ds = backend.open_dataset(synthetic_geotiff, multidim=False, band_as_dim=band_as_dim)
     for name in ds.data_vars:
         _assert_matches(ds[name], ds[name].compute())
 
@@ -65,12 +63,10 @@ def test_band_dim_fancy_band_keys(backend, synthetic_geotiff):
     for idx in (
         {"band": np.array([2, 0])},
         {"band": np.array([True, False, True])},
-        {"band": slice(None, None, -1)},   # silently EMPTY before this fix
+        {"band": slice(None, None, -1)},  # silently EMPTY before this fix
         {"band": 1, "y": slice(None, None, -1), "x": slice(0, 100, 3)},
     ):
-        np.testing.assert_array_equal(
-            da.isel(idx).values, ref.isel(idx).values, err_msg=repr(idx)
-        )
+        np.testing.assert_array_equal(da.isel(idx).values, ref.isel(idx).values, err_msg=repr(idx))
 
 
 def test_multidim_indexing_matrix(backend, foo5_vrt):
@@ -89,6 +85,4 @@ def test_multidim_boolean_isel(backend, foo5_vrt):
     mask[-1] = True
     got = da.isel({dim: mask})
     assert got.sizes[dim] == 1
-    np.testing.assert_array_equal(
-        got.values, da.compute().isel({dim: mask}).values
-    )
+    np.testing.assert_array_equal(got.values, da.compute().isel({dim: mask}).values)

@@ -55,7 +55,7 @@ pip install gdalxarray
 
 conda-forge has well-maintained GDAL builds for Linux, macOS, and Windows.
 
-This was tried on ubuntu. 
+This was tried on ubuntu.
 
 ```bash
 DEBIAN_FRONTEND=noninteractive apt-get update

@@ -135,8 +135,6 @@ def test_no_live_objects_in_encoding(backend, foo5_vrt):
     ds = backend.open_dataset(foo5_vrt, multidim=True)
     for key, val in ds.encoding.items():
         # Strings, primitives, or None - never GDAL Python proxy objects
-        assert val is None or isinstance(val, (str, int, float, bool)), (
-            f"encoding[{key!r}] is a {type(val).__name__}, not serialization-safe"
-        )
-
-
+        assert val is None or isinstance(
+            val, str | int | float | bool
+        ), f"encoding[{key!r}] is a {type(val).__name__}, not serialization-safe"

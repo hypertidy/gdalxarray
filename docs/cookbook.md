@@ -30,7 +30,7 @@ reproducible in notebooks.
 ## NCI THREDDS (rate-limited HTTPS source)
 
 Some institutional servers rate-limit aggressive parallel
-reads. The recipe is to cap  parallelism, we find that 8 is safe for [NCI Thredds](https://thredds.nci.org.au/). 
+reads. The recipe is to cap  parallelism, we find that 8 is safe for [NCI Thredds](https://thredds.nci.org.au/).
 
 ```python
 import dask

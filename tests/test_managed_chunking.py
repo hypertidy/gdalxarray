@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import xarray as xr
 
 da = pytest.importorskip("dask.array")
 
@@ -33,23 +32,19 @@ def test_preferred_chunks_recorded(backend, synthetic_geotiff):
 
 def test_explicit_chunks_values_roundtrip(backend, synthetic_geotiff):
     lazy = backend.open_dataset(synthetic_geotiff, multidim=False)
-    chunked = backend.open_dataset(
-        synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32}
-    )
+    chunked = backend.open_dataset(synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32})
     arr = chunked["band_data"].data
     assert isinstance(arr, da.Array)
-    np.testing.assert_array_equal(
-        chunked["band_data"].values, lazy["band_data"].values
-    )
+    np.testing.assert_array_equal(chunked["band_data"].values, lazy["band_data"].values)
 
 
 def test_chunk_layer_names_deterministic(backend, synthetic_geotiff):
-    n1 = backend.open_dataset(
-        synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32}
-    )["band_data"].data.name
-    n2 = backend.open_dataset(
-        synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32}
-    )["band_data"].data.name
+    n1 = backend.open_dataset(synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32})[
+        "band_data"
+    ].data.name
+    n2 = backend.open_dataset(synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32})[
+        "band_data"
+    ].data.name
     assert n1 == n2
     assert n1.startswith("gdalxarray-")
 
@@ -76,9 +71,7 @@ def test_chunked_pickles_and_tokenizes(backend, synthetic_geotiff):
     """The dask graph must not capture live GDAL handles (issue #31)."""
     from dask.base import tokenize
 
-    ds = backend.open_dataset(
-        synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32}
-    )
+    ds = backend.open_dataset(synthetic_geotiff, multidim=False, chunks={"y": 32, "x": 32})
     # strict tokenization of the collection must succeed
     t1 = tokenize(ds["band_data"].data)
     t2 = tokenize(ds["band_data"].data)

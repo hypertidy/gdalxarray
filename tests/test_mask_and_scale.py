@@ -31,9 +31,7 @@ def plain_byte_tif(tmp_path):
     for i in range(2):
         band = ds.GetRasterBand(i + 1)
         band.SetDescription(f"b{i + 1}")
-        band.WriteArray(
-            (np.arange(12, dtype=np.uint8) + 1).reshape(3, 4) * (i + 1)
-        )
+        band.WriteArray((np.arange(12, dtype=np.uint8) + 1).reshape(3, 4) * (i + 1))
     ds = None
     return path
 
@@ -63,9 +61,7 @@ def hetero_scale_tif(tmp_path):
 
 @pytest.mark.parametrize("band_as_dim", [True, False])
 def test_unscaled_keeps_native_dtype(backend, plain_byte_tif, band_as_dim):
-    ds = backend.open_dataset(
-        plain_byte_tif, multidim=False, band_as_dim=band_as_dim
-    )
+    ds = backend.open_dataset(plain_byte_tif, multidim=False, band_as_dim=band_as_dim)
     name = "band_data" if band_as_dim else "b1"
     assert ds[name].dtype == np.uint8, ds[name].dtype
     assert "scale_factor" not in ds[name].attrs
@@ -87,9 +83,7 @@ def test_mask_and_scale_default_applies(backend, synthetic_geotiff_with_scale):
 
 
 def test_mask_and_scale_false_returns_raw(backend, synthetic_geotiff_with_scale):
-    ds = backend.open_dataset(
-        synthetic_geotiff_with_scale, multidim=False, mask_and_scale=False
-    )
+    ds = backend.open_dataset(synthetic_geotiff_with_scale, multidim=False, mask_and_scale=False)
     v = ds["band_data"].values
     assert v.dtype == np.int16, v.dtype
     assert (v[0, 0:10, :] == -999).all()
@@ -118,9 +112,7 @@ def test_heterogeneous_warns_and_stays_raw(backend, hetero_scale_tif):
         ds = backend.open_dataset(hetero_scale_tif, multidim=False)
     bd = ds["band_data"]
     assert "band_scale_factor" in ds.coords
-    np.testing.assert_array_equal(
-        ds["band_scale_factor"].values, [0.01, 0.1]
-    )
+    np.testing.assert_array_equal(ds["band_scale_factor"].values, [0.01, 0.1])
     # never half-decoded: no CF names lingering on the variable
     assert "scale_factor" not in bd.attrs
     assert "scale_factor" not in bd.encoding
@@ -131,9 +123,7 @@ def test_heterogeneous_warns_and_stays_raw(backend, hetero_scale_tif):
 
 
 def test_heterogeneous_decodes_per_band_as_vars(backend, hetero_scale_tif):
-    ds = backend.open_dataset(
-        hetero_scale_tif, multidim=False, band_as_dim=False
-    )
+    ds = backend.open_dataset(hetero_scale_tif, multidim=False, band_as_dim=False)
     np.testing.assert_allclose(ds["b1"].values[1:, :], 10.0)
     np.testing.assert_allclose(ds["b2"].values[1:, :], 100.0)
     assert np.isnan(ds["b1"].values[0, :]).all()

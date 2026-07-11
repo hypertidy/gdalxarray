@@ -9,12 +9,12 @@ The xarray engine itself. Most users invoke it via
 ::: gdalxarray.GDALBackendEntrypoint
     options:
       show_source: false
-    
+
 ## Recipe builders
 
 Helper functions that build GDAL configuration recipes - VRT strings,
 typically - for downstream consumption by the engine.
-  
+
 ::: gdalxarray.warp
     options:
       show_source: false

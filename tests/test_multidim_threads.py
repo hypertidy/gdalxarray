@@ -37,9 +37,7 @@ def _first_mdarray(path):
 
 def test_per_thread_handles_distinct(foo5_vrt):
     ds, root, mdarray = _first_mdarray(foo5_vrt)
-    arr = GDALMultiDimArray(
-        mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root
-    )
+    arr = GDALMultiDimArray(mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root)
     seed = arr._get_mdarray()
 
     def grab(_):
@@ -55,9 +53,7 @@ def test_per_thread_handles_distinct(foo5_vrt):
 
 def test_concurrent_reads_correct(foo5_vrt):
     ds, root, mdarray = _first_mdarray(foo5_vrt)
-    arr = GDALMultiDimArray(
-        mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root
-    )
+    arr = GDALMultiDimArray(mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root)
     key = tuple(slice(None) for _ in arr.shape)
     expected = arr._raw_indexing_method(key)
 
@@ -73,20 +69,14 @@ def test_threaded_dask_compute_matches_lazy(backend, foo5_vrt):
     lazy = backend.open_dataset(foo5_vrt, multidim=True)
     chunked = backend.open_dataset(foo5_vrt, multidim=True, chunks={})
     name = next(iter(chunked.data_vars))
-    got = (
-        chunked[name]
-        .mean()
-        .compute(scheduler="threads", num_workers=8)
-    )
+    got = chunked[name].mean().compute(scheduler="threads", num_workers=8)
     expected = float(lazy[name].mean())
     assert float(got) == pytest.approx(expected)
 
 
 def test_pickle_roundtrip_reads(foo5_vrt):
     ds, root, mdarray = _first_mdarray(foo5_vrt)
-    arr = GDALMultiDimArray(
-        mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root
-    )
+    arr = GDALMultiDimArray(mdarray, filename=foo5_vrt, _parent_dataset=ds, _parent_group=root)
     key = tuple(slice(None) for _ in arr.shape)
     expected = arr._raw_indexing_method(key)
     arr2 = pickle.loads(pickle.dumps(arr))

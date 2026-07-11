@@ -138,7 +138,7 @@ def _axis_read_plan(key, size):
     never reach GDAL. Negative ints and slice bounds follow Python
     semantics via ``slice.indices``.
     """
-    if isinstance(key, (int, np.integer)):
+    if isinstance(key, int | np.integer):
         k = int(key)
         if k < 0:
             k += size
@@ -156,6 +156,7 @@ def _axis_read_plan(key, size):
         lo = int(idx.min())
         return lo, int(idx.max()) - lo + 1, idx - lo, n, False
     raise IndexError(f"Unsupported index type: {type(key)}")
+
 
 # ---------------------------------------------------------------------------
 # Classic-raster, single band
@@ -243,6 +244,7 @@ class GDALBackendArray(BackendArray):
             indexing.IndexingSupport.BASIC,
             self._raw_indexing_method,
         )
+
     def _raw_indexing_method(self, key):
         """Read (y, x) from a tuple of ints and slices.
 
@@ -291,6 +293,8 @@ class GDALBackendArray(BackendArray):
         if squeeze_x:
             return data[:, 0]
         return data
+
+
 # ---------------------------------------------------------------------------
 # Classic-raster, all bands as one (band, y, x) array
 # ---------------------------------------------------------------------------
@@ -369,6 +373,7 @@ class GDALMultiBandArray(BackendArray):
             indexing.IndexingSupport.BASIC,
             self._raw_indexing_method,
         )
+
     def _raw_indexing_method(self, key):
         """Read via ``dataset.ReadAsArray`` with an explicit band_list.
 
@@ -389,22 +394,18 @@ class GDALMultiBandArray(BackendArray):
         nbands = len(self.band_indices)
         squeeze_b = False
 
-        if isinstance(b_idx, (int, np.integer)):
+        if isinstance(b_idx, int | np.integer):
             b = int(b_idx)
             if b < 0:
                 b += nbands
             if not 0 <= b < nbands:
-                raise IndexError(
-                    f"band index {b_idx} out of bounds for {nbands} bands"
-                )
+                raise IndexError(f"band index {b_idx} out of bounds for {nbands} bands")
             positions = [b]
             squeeze_b = True
         elif isinstance(b_idx, slice):
             positions = list(range(*b_idx.indices(nbands)))
-        elif isinstance(b_idx, (list, np.ndarray)):
-            positions = [
-                int(i) + nbands if int(i) < 0 else int(i) for i in b_idx
-            ]
+        elif isinstance(b_idx, list | np.ndarray):
+            positions = [int(i) + nbands if int(i) < 0 else int(i) for i in b_idx]
         else:
             raise IndexError(f"Unsupported band index type: {type(b_idx)}")
         band_list = [self.band_indices[i] for i in positions]
@@ -461,6 +462,8 @@ class GDALMultiBandArray(BackendArray):
         if axes_to_squeeze:
             data = np.squeeze(data, axis=tuple(axes_to_squeeze))
         return data
+
+
 # ---------------------------------------------------------------------------
 # Multidim
 # ---------------------------------------------------------------------------
@@ -487,7 +490,9 @@ class GDALMultiDimArray(BackendArray):
     read, which makes the class usable under distributed schedulers.
     """
 
-    def __init__(self, mdarray, filename=None, _parent_dataset=None, _parent_group=None, config_options=None):
+    def __init__(
+        self, mdarray, filename=None, _parent_dataset=None, _parent_group=None, config_options=None
+    ):
         self._filename = filename
         self._config_options = dict(config_options or {})
         self._fullname = mdarray.GetFullName()  # e.g. "/group/array"
@@ -516,17 +521,13 @@ class GDALMultiDimArray(BackendArray):
                     "reads from other threads or after unpickling need one "
                     "to reopen the store (issue #34)"
                 )
-            ds = gdal.OpenEx(
-                self._filename, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly
-            )
+            ds = gdal.OpenEx(self._filename, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly)
             if ds is None:
                 raise ValueError(f"Could not reopen {self._filename}")
             root = ds.GetRootGroup()
             md = root.OpenMDArrayFromFullname(self._fullname)
             if md is None:
-                raise ValueError(
-                    f"Could not open array {self._fullname!r} in {self._filename}"
-                )
+                raise ValueError(f"Could not open array {self._fullname!r} in {self._filename}")
             # Keep the whole chain alive for this thread's lifetime.
             self._local.ds = ds
             self._local.root = root
@@ -581,6 +582,7 @@ class GDALMultiDimArray(BackendArray):
             indexing.IndexingSupport.BASIC,
             self._raw_indexing_method,
         )
+
     def _raw_indexing_method(self, key):
         """Read data from GDAL multidim array."""
         if not isinstance(key, tuple):
@@ -606,14 +608,13 @@ class GDALMultiDimArray(BackendArray):
                     start = start + (count - 1) * step
                     step = -step
                     flip_axes.append(i)
-            elif isinstance(k, (int, float, np.integer, np.floating)):
+            elif isinstance(k, int | float | np.integer | np.floating):
                 start = int(k)
                 if start < 0:
                     start += self.shape[i]
                 if not 0 <= start < self.shape[i]:
                     raise IndexError(
-                        f"index {k} out of bounds for dimension {i} "
-                        f"of size {self.shape[i]}"
+                        f"index {k} out of bounds for dimension {i} " f"of size {self.shape[i]}"
                     )
                 count = 1
                 step = 1
@@ -786,17 +787,21 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         with _gdal_config_context(config_options):
             if multidim:
                 ds = self._open_multidim(
-                    filename_or_obj, group, drop_variables, mask_and_scale,
+                    filename_or_obj,
+                    group,
+                    drop_variables,
+                    mask_and_scale,
                     config_options,
                 )
             else:
                 ds = self._open_raster(
-                    filename_or_obj, drop_variables, band_as_dim=band_as_dim,
-                    mask_and_scale=mask_and_scale, config_options=config_options,
+                    filename_or_obj,
+                    drop_variables,
+                    band_as_dim=band_as_dim,
+                    mask_and_scale=mask_and_scale,
+                    config_options=config_options,
                 )
-        return self._maybe_chunk_dataset(
-            ds, chunks, filename_or_obj, config_options
-        )
+        return self._maybe_chunk_dataset(ds, chunks, filename_or_obj, config_options)
 
     @staticmethod
     def _maybe_chunk_dataset(ds, chunks, filename_or_obj, config_options=None):
@@ -837,7 +842,14 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Classic-raster path
     # ------------------------------------------------------------------
 
-    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True, mask_and_scale=True, config_options=None):
+    def _open_raster(
+        self,
+        filename_or_obj,
+        drop_variables,
+        band_as_dim=True,
+        mask_and_scale=True,
+        config_options=None,
+    ):
         """Open using GDAL's classic raster API."""
         logger.debug("filename_or_obj: %s", filename_or_obj)
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
@@ -876,13 +888,21 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         if band_as_dim:
             ds = self._raster_as_band_dim(
-                filename_or_obj, dataset, drop_variables, num_bands,
-                mask_and_scale, config_options,
+                filename_or_obj,
+                dataset,
+                drop_variables,
+                num_bands,
+                mask_and_scale,
+                config_options,
             )
         else:
             ds = self._raster_as_vars(
-                filename_or_obj, dataset, drop_variables, num_bands,
-                mask_and_scale, config_options,
+                filename_or_obj,
+                dataset,
+                drop_variables,
+                num_bands,
+                mask_and_scale,
+                config_options,
             )
 
         # Spatial coords and CRS for both layouts
@@ -896,7 +916,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             ds.encoding["gdal_driver"] = driver_name
         return ds
 
-    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True, config_options=None):
+    def _raster_as_band_dim(
+        self,
+        filename_or_obj,
+        dataset,
+        drop_variables,
+        num_bands,
+        mask_and_scale=True,
+        config_options=None,
+    ):
         """Bands collapsed into a single ``band`` dimension on ``band_data``."""
         band_indices = list(range(1, num_bands + 1))
         descriptions = []
@@ -992,7 +1020,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
         return ds
 
-    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True, config_options=None):
+    def _raster_as_vars(
+        self,
+        filename_or_obj,
+        dataset,
+        drop_variables,
+        num_bands,
+        mask_and_scale=True,
+        config_options=None,
+    ):
         """Each band as a separate (y, x) data variable."""
         data_vars = {}
 
@@ -1041,7 +1077,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Multidim path
     # ------------------------------------------------------------------
 
-    def _open_multidim(self, filename_or_obj, group, drop_variables, mask_and_scale=True, config_options=None):
+    def _open_multidim(
+        self, filename_or_obj, group, drop_variables, mask_and_scale=True, config_options=None
+    ):
         """Open using GDAL's multidimensional API."""
         dataset = gdal.OpenEx(filename_or_obj, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly)
         if dataset is None:
