@@ -1021,7 +1021,11 @@
   before decoding if <code>mask_and_scale=False</code> is passed).</p>
 <h3 id="changed">Changed</h3>
 <ul>
-<li>Chunking is delegated to xarray's managed path (#31, closes #30). The
+<li>
+<p>Added silencing for HDF5 messages. </p>
+</li>
+<li>
+<p>Chunking is delegated to xarray's managed path (#31, closes #30). The
   backend no longer constructs dask collections itself: all variables
   open as lazy arrays, native GDAL block sizes are recorded in each data
   variable's <code>encoding["preferred_chunks"]</code>, and <code>chunks=</code> is applied
@@ -1032,7 +1036,8 @@
   recognise it, which fixes "Could not find a Chunk Manager which
   recognises type ..." errors under dask's expression-array migration,
   and the explicit token means xarray only ever tokenizes strings, so
-  the unpicklable GDAL handles are never pickled or tokenized.</li>
+  the unpicklable GDAL handles are never pickled or tokenized.</p>
+</li>
 </ul>
 <p>Consequences: dask is now an optional dependency (install with
   <code>gdalxarray[dask]</code> or have dask present when passing <code>chunks=</code>); dask
