@@ -115,6 +115,8 @@
 
 ### Changed
 
+- Added silencing for HDF5 messages. 
+
 - Chunking is delegated to xarray's managed path (#31, closes #30). The
   backend no longer constructs dask collections itself: all variables
   open as lazy arrays, native GDAL block sizes are recorded in each data

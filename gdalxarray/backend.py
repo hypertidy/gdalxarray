@@ -58,6 +58,54 @@ def _expand_tilde(dsn):
     return dsn
 
 
+_HDF5_SILENCED = threading.local()
+
+
+def _silence_hdf5_diagnostics_this_thread():
+    """Best-effort: disable HDF5 error auto-printing on this thread.
+
+    HDF5 error stacks are per-thread in threadsafe builds, and GDAL /
+    netcdf-c disable auto-printing only on the thread that initialized
+    the library. Per-thread reopens (issue #34) therefore enter HDF5
+    from threads where printing is still enabled, and harmless probes
+    for absent optional attributes spew HDF5-DIAG stacks to stderr.
+    This calls H5Eset_auto2(H5E_DEFAULT, NULL, NULL) via ctypes on the
+    libhdf5 already loaded in-process; real failures still surface as
+    GDAL exceptions. No-op if libhdf5 is absent or the call fails.
+    """
+    if getattr(_HDF5_SILENCED, "done", False):
+        return
+    _HDF5_SILENCED.done = True
+    try:
+        import ctypes
+        import ctypes.util
+
+        lib = None
+        for name in (
+            "libhdf5.so.310",
+            "libhdf5.so.200",
+            "libhdf5.so.103",
+            "libhdf5_serial.so.103",
+            "libhdf5.so",
+            ctypes.util.find_library("hdf5"),
+        ):
+            if not name:
+                continue
+            try:
+                lib = ctypes.CDLL(name)
+                break
+            except OSError:
+                continue
+        if lib is None:
+            return
+        fn = lib.H5Eset_auto2
+        fn.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p]
+        fn.restype = ctypes.c_int
+        fn(0, None, None)  # 0 == H5E_DEFAULT: this thread's stack
+    except Exception:  # never let diagnostics hygiene break a read
+        pass
+
+
 def _axis_read_plan(key, size):
     """Plan a contiguous 1-D GDAL read for an int or slice key.
 
@@ -426,6 +474,7 @@ class GDALMultiDimArray(BackendArray):
     def _get_mdarray(self):
         """Per-thread MDArray handle, reopened lazily off-thread."""
         if not hasattr(self._local, "mdarray"):
+            _silence_hdf5_diagnostics_this_thread()
             if self._filename is None:
                 raise RuntimeError(
                     "GDALMultiDimArray was constructed without a filename; "
