@@ -2,7 +2,7 @@
 # Then ruff fires on every commit; tests can be wired in via CI.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.0
+    rev: v0.15.21  # keep the single source of ruff version truth here; CI runs pre-commit
     hooks:
       - id: ruff
         args: [--fix]

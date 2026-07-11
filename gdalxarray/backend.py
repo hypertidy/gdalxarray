@@ -614,7 +614,7 @@ class GDALMultiDimArray(BackendArray):
                     start += self.shape[i]
                 if not 0 <= start < self.shape[i]:
                     raise IndexError(
-                        f"index {k} out of bounds for dimension {i} " f"of size {self.shape[i]}"
+                        f"index {k} out of bounds for dimension {i} of size {self.shape[i]}"
                     )
                 count = 1
                 step = 1
