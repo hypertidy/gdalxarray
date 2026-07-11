@@ -2,22 +2,26 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://hypertidy.github.io/gdalxarray/</loc>
-         <lastmod>2026-07-10</lastmod>
+         <lastmod>2026-07-11</lastmod>
     </url>
     <url>
          <loc>https://hypertidy.github.io/gdalxarray/api/</loc>
-         <lastmod>2026-07-10</lastmod>
+         <lastmod>2026-07-11</lastmod>
     </url>
     <url>
          <loc>https://hypertidy.github.io/gdalxarray/changelog/</loc>
-         <lastmod>2026-07-10</lastmod>
+         <lastmod>2026-07-11</lastmod>
     </url>
     <url>
          <loc>https://hypertidy.github.io/gdalxarray/cookbook/</loc>
-         <lastmod>2026-07-10</lastmod>
+         <lastmod>2026-07-11</lastmod>
     </url>
     <url>
          <loc>https://hypertidy.github.io/gdalxarray/install/</loc>
-         <lastmod>2026-07-10</lastmod>
+         <lastmod>2026-07-11</lastmod>
+    </url>
+    <url>
+         <loc>https://hypertidy.github.io/gdalxarray/sst-analysis/</loc>
+         <lastmod>2026-07-11</lastmod>
     </url>
 </urlset>
