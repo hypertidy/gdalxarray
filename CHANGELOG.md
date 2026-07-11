@@ -1,6 +1,6 @@
 # Changelog
 
-## [dev]
+## [0.5.0] - 2026-07-11
 
 ### Added
 
@@ -130,6 +130,11 @@
   before decoding if `mask_and_scale=False` is passed).
 
 ### Changed
+
+- Python 3.11 or newer is required. The dependency stack has moved past
+  3.10 (rasterix 0.2.x and current xarray both require >= 3.11), so 3.10
+  environments could not resolve an install at all; requires-python now
+  states this so pip skips this release cleanly on 3.10.
 
 - Added silencing for HDF5 messages.
 
@@ -277,7 +282,8 @@ Initial release as `gdx`.
   by Dask for `_meta` inference) no longer hang or attempt full array allocation.
 - Slice start/stop of `0` now parsed correctly.
 
-[Unreleased]: https://github.com/hypertidy/gdalxarray/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/hypertidy/gdalxarray/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/hypertidy/gdalxarray/compare/v0.4.0...v0.5.0
 [0.3.0]: https://github.com/hypertidy/gdalxarray/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/hypertidy/gdalxarray/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hypertidy/gdalxarray/releases/tag/v0.1.0

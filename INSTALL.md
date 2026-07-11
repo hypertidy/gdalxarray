@@ -129,7 +129,8 @@ dependencies:
 
 - `numpy`
 - `xarray>=2025.6`
-- `dask`
+- `dask` (optional: only needed when opening with `chunks=`;
+  install as `gdalxarray[dask]`)
 - `affine`
 - `rasterix`
 - `xproj`

@@ -820,6 +820,14 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         """
         if chunks is None:
             return ds
+        try:
+            import dask  # noqa: F401
+        except ImportError as e:
+            raise ImportError(
+                "opening with chunks= requires dask, which is an optional "
+                "dependency: install it with 'pip install gdalxarray[dask]' "
+                "or add dask to the environment"
+            ) from e
         # The explicit token becomes the dask layer name and short-circuits
         # tokenization of the wrapped arrays (issue #31), so it must carry
         # everything that affects read results: the dsn AND the config
