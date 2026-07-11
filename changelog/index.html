@@ -402,6 +402,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fixed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -441,7 +452,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -480,7 +491,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -552,7 +563,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -591,7 +602,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -664,6 +675,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#fixed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -703,7 +725,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added" class="md-nav__link">
+  <a href="#added_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -742,7 +764,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_1" class="md-nav__link">
+  <a href="#added_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -814,7 +836,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#added_2" class="md-nav__link">
+  <a href="#added_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -853,7 +875,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#added_3" class="md-nav__link">
+  <a href="#added_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Added
@@ -901,6 +923,22 @@
 
 <h1 id="changelog">Changelog</h1>
 <h2 id="dev">[dev]</h2>
+<h3 id="added">Added</h3>
+<ul>
+<li><code>open_dataset(..., config_options={...})</code> surfaces GDAL configuration
+  options (#25), e.g. <code>{"GDAL_HTTP_MAX_RETRY": "3"}</code>. Options are
+  applied thread-locally around the open and re-entered around every
+  read, then unset again: per-thread reopens under dask (#34) and reads
+  on distributed workers after unpickling inherit them by construction,
+  and concurrent opens with different options never interfere or leak
+  into unrelated work sharing a thread pool. Values are stringified,
+  the options participate in dask tokenization both on the raw
+  backend arrays and in the managed-chunking layer token (same dsn
+  with different options yields different layer names, so dask never
+  deduplicates across differently-configured opens), and they are not applied during engine
+  auto-detection (<code>guess_can_open</code>). <code>warp()</code> is unchanged; passing
+  options there is a possible follow-up.</li>
+</ul>
 <h3 id="fixed">Fixed</h3>
 <ul>
 <li>
@@ -1048,7 +1086,7 @@
   recorded native block sizes); and CF decoders now always operate on
   lazy arrays rather than dask collections.</p>
 <h2 id="040-2026-06-16">[0.4.0] - 2026-06-16</h2>
-<h3 id="added">Added</h3>
+<h3 id="added_1">Added</h3>
 <ul>
 <li><code>gdalxarray.warp()</code> — build lazy warp-VRT recipes for reprojection,
   regridding, GCP/RPC/geolocation-array transformation, cutline clipping,
@@ -1066,7 +1104,7 @@
   produced an empty 512x512 stub Dataset.</li>
 </ul>
 <h2 id="030-2026-06-15"><a href="https://github.com/hypertidy/gdalxarray/compare/v0.2.0...v0.3.0">0.3.0</a> - 2026-06-15</h2>
-<h3 id="added_1">Added</h3>
+<h3 id="added_2">Added</h3>
 <ul>
 <li><code>band_as_dim</code> parameter on <code>open_dataset</code> (classic raster mode, default <code>True</code>).
   Bands now become an xarray <code>band</code> dimension on a single <code>band_data</code> DataArray.
@@ -1133,7 +1171,7 @@
 <li>Packaging modernised to PEP 621 / PEP 639 standards.</li>
 <li><code>requires-python</code> bumped to <code>&gt;=3.10</code> to match <code>xarray&gt;=2025.6</code>.</li>
 </ul>
-<h3 id="added_2">Added</h3>
+<h3 id="added_3">Added</h3>
 <ul>
 <li>CF datetime decoding for time coordinates using <code>units</code> from
   <code>MDArray.GetUnit()</code> and <code>calendar</code> attribute.</li>
@@ -1151,7 +1189,7 @@
 </ul>
 <h2 id="010-2026-01-20"><a href="https://github.com/hypertidy/gdalxarray/releases/tag/v0.1.0">0.1.0</a> - 2026-01-20</h2>
 <p>Initial release as <code>gdx</code>.</p>
-<h3 id="added_3">Added</h3>
+<h3 id="added_4">Added</h3>
 <ul>
 <li>GDAL backend for xarray, supporting both Classic and Multidimensional APIs.</li>
 <li><code>chunks={}</code> uses native block sizes from GDAL's <code>GetBlockSize()</code>, aligning
