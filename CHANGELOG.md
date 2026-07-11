@@ -2,6 +2,22 @@
 
 ## [dev]
 
+### Added
+
+- `open_dataset(..., config_options={...})` surfaces GDAL configuration
+  options (#25), e.g. `{"GDAL_HTTP_MAX_RETRY": "3"}`. Options are
+  applied thread-locally around the open and re-entered around every
+  read, then unset again: per-thread reopens under dask (#34) and reads
+  on distributed workers after unpickling inherit them by construction,
+  and concurrent opens with different options never interfere or leak
+  into unrelated work sharing a thread pool. Values are stringified,
+  the options participate in dask tokenization both on the raw
+  backend arrays and in the managed-chunking layer token (same dsn
+  with different options yields different layer names, so dask never
+  deduplicates across differently-configured opens), and they are not applied during engine
+  auto-detection (`guess_can_open`). `warp()` is unchanged; passing
+  options there is a possible follow-up.
+
 ### Fixed
 
 - Outer and boolean indexers now work on all read paths, and stepped or

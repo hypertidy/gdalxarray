@@ -12,6 +12,7 @@ dispatches to one of two open paths depending on the ``multidim`` flag.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -56,6 +57,25 @@ def _expand_tilde(dsn):
     if isinstance(dsn, str) and dsn.startswith("~"):
         return os.path.expanduser(dsn)
     return dsn
+
+
+def _gdal_config_context(config_options):
+    """Thread-locally scoped GDAL configuration options (issue #25).
+
+    Returns a context manager applying ``config_options`` for the
+    duration of a GDAL call block on the *current thread only*, so
+    concurrent dask workers with different stores never see each
+    other's options and nothing leaks to unrelated work sharing the
+    thread pool. Values are stringified. Empty/None is a no-op.
+    """
+    if not config_options:
+        return contextlib.nullcontext()
+    opts = {str(k): str(v) for k, v in config_options.items()}
+    try:
+        return gdal.config_options(opts, thread_local=True)
+    except TypeError:
+        # older bindings without the thread_local parameter
+        return gdal.config_options(opts)
 
 
 _HDF5_SILENCED = threading.local()
@@ -145,8 +165,9 @@ def _axis_read_plan(key, size):
 class GDALBackendArray(BackendArray):
     """Wrap one GDAL raster band as an xarray BackendArray of shape (y, x)."""
 
-    def __init__(self, filename: str, band_index: int = 1):
+    def __init__(self, filename: str, band_index: int = 1, config_options=None):
         self.filename = filename
+        self._config_options = dict(config_options or {})
         self.band_index = band_index
         self._local = threading.local()
         logger.debug("filename: %s", filename)
@@ -168,7 +189,12 @@ class GDALBackendArray(BackendArray):
         return self._local.band
 
     def __dask_tokenize__(self):
-        return (type(self).__name__, self.filename, self.band_index)
+        return (
+            type(self).__name__,
+            self.filename,
+            self.band_index,
+            tuple(sorted(self._config_options.items())),
+        )
 
     @staticmethod
     def _gdal_to_numpy_dtype(gdal_dtype):
@@ -244,14 +270,15 @@ class GDALBackendArray(BackendArray):
                 shape.append(x_len)
             return np.empty(shape, dtype=self._dtype)
 
-        band = self._get_band()
         logger.debug("read: yoff=%s xoff=%s ysize=%s xsize=%s", y0, x0, ny, nx)
-        data = band.ReadAsArray(
-            xoff=x0,
-            yoff=y0,
-            win_xsize=nx,
-            win_ysize=ny,
-        )
+        with _gdal_config_context(self._config_options):
+            band = self._get_band()
+            data = band.ReadAsArray(
+                xoff=x0,
+                yoff=y0,
+                win_xsize=nx,
+                win_ysize=ny,
+            )
         if y_rel is not None:
             data = data[y_rel, :]
         if x_rel is not None:
@@ -278,8 +305,9 @@ class GDALMultiBandArray(BackendArray):
     iterating per-band.
     """
 
-    def __init__(self, filename: str, band_indices: list[int] | None = None):
+    def __init__(self, filename: str, band_indices: list[int] | None = None, config_options=None):
         self.filename = filename
+        self._config_options = dict(config_options or {})
         self._local = threading.local()
         logger.debug("multiband filename: %s", filename)
 
@@ -304,7 +332,12 @@ class GDALMultiBandArray(BackendArray):
         return self._local.ds
 
     def __dask_tokenize__(self):
-        return (type(self).__name__, self.filename, tuple(self.band_indices))
+        return (
+            type(self).__name__,
+            self.filename,
+            tuple(self.band_indices),
+            tuple(sorted(self._config_options.items())),
+        )
 
     @property
     def shape(self):
@@ -391,7 +424,6 @@ class GDALMultiBandArray(BackendArray):
                 shape.append(x_len)
             return np.empty(shape, dtype=self._dtype)
 
-        ds = self._get_dataset()
         logger.debug(
             "read: bands=%s yoff=%s xoff=%s ysize=%s xsize=%s",
             band_list,
@@ -400,13 +432,15 @@ class GDALMultiBandArray(BackendArray):
             ny,
             nx,
         )
-        data = ds.ReadAsArray(
-            xoff=x0,
-            yoff=y0,
-            xsize=nx,
-            ysize=ny,
-            band_list=band_list,
-        )
+        with _gdal_config_context(self._config_options):
+            ds = self._get_dataset()
+            data = ds.ReadAsArray(
+                xoff=x0,
+                yoff=y0,
+                xsize=nx,
+                ysize=ny,
+                band_list=band_list,
+            )
 
         # ReadAsArray returns 2D for a single band, 3D for multiple - normalise
         if data.ndim == 2:
@@ -453,8 +487,9 @@ class GDALMultiDimArray(BackendArray):
     read, which makes the class usable under distributed schedulers.
     """
 
-    def __init__(self, mdarray, filename=None, _parent_dataset=None, _parent_group=None):
+    def __init__(self, mdarray, filename=None, _parent_dataset=None, _parent_group=None, config_options=None):
         self._filename = filename
+        self._config_options = dict(config_options or {})
         self._fullname = mdarray.GetFullName()  # e.g. "/group/array"
         self._local = threading.local()
         # Seed this thread with the open handle (no reopen on first read).
@@ -529,6 +564,7 @@ class GDALMultiDimArray(BackendArray):
             self._shape,
             str(self._dtype),
             self._chunks,
+            tuple(sorted(self._config_options.items())),
         )
 
     def __getitem__(self, key):
@@ -596,7 +632,21 @@ class GDALMultiDimArray(BackendArray):
             return np.empty(shape, dtype=self._dtype)
 
         # Resolve the per-thread handle once per read (issue #34): every
-        # GDAL call below must go through it, never a shared handle.
+        # GDAL call below must go through it, never a shared handle. The
+        # config context (issue #25) covers the reopen and all GDAL calls.
+        with _gdal_config_context(self._config_options):
+            data = self._read_mdim(key, starts, counts, steps)
+
+        for ax in flip_axes:
+            data = np.flip(data, axis=ax)
+
+        # Squeeze out integer-indexed dimensions
+        for dim_idx in reversed(squeeze_dims):
+            data = np.squeeze(data, axis=dim_idx)
+
+        return data
+
+    def _read_mdim(self, key, starts, counts, steps):
         mdarray = self._get_mdarray()
 
         # AdviseRead is a prefetch hint. Compute a reasonable CACHE_SIZE for it,
@@ -638,13 +688,6 @@ class GDALMultiDimArray(BackendArray):
             array_step=steps,
         )
 
-        for ax in flip_axes:
-            data = np.flip(data, axis=ax)
-
-        # Squeeze out integer-indexed dimensions
-        for dim_idx in reversed(squeeze_dims):
-            data = np.squeeze(data, axis=dim_idx)
-
         return data
 
 
@@ -676,6 +719,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         multidim=True,
         group=None,
         band_as_dim=True,
+        config_options=None,
         mask_and_scale=None,
         decode_times=None,
         decode_timedelta=None,
@@ -719,6 +763,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             band_nodata/band_scale_factor/band_add_offset coordinates and
             a warning is emitted (use ``band_as_dim=False`` to decode each
             band independently).
+        config_options : dict, optional
+            GDAL configuration options, e.g.
+            ``{"GDAL_HTTP_MAX_RETRY": "3", "GDAL_HTTP_RETRY_DELAY": "5"}``.
+            Applied thread-locally around the open and around every
+            subsequent read, including per-thread reopens under dask
+            (issue #34) and reads on distributed workers after
+            unpickling, then unset again, so concurrent opens with
+            different options do not interfere. Values are stringified.
+            Not applied during engine auto-detection (guess_can_open).
         mask_and_scale : bool, optional
             If True (default), apply CF mask/scale decoding: nodata becomes
             NaN and scale_factor/add_offset are applied, with the original
@@ -729,19 +782,24 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         # xarray passes mask_and_scale=None to mean "backend default"; the
         # default here matches xarray's own (apply CF mask/scale decoding).
         mask_and_scale = True if mask_and_scale is None else bool(mask_and_scale)
-        if multidim:
-            ds = self._open_multidim(
-                filename_or_obj, group, drop_variables, mask_and_scale
-            )
-        else:
-            ds = self._open_raster(
-                filename_or_obj, drop_variables, band_as_dim=band_as_dim,
-                mask_and_scale=mask_and_scale,
-            )
-        return self._maybe_chunk_dataset(ds, chunks, filename_or_obj)
+        config_options = dict(config_options or {})
+        with _gdal_config_context(config_options):
+            if multidim:
+                ds = self._open_multidim(
+                    filename_or_obj, group, drop_variables, mask_and_scale,
+                    config_options,
+                )
+            else:
+                ds = self._open_raster(
+                    filename_or_obj, drop_variables, band_as_dim=band_as_dim,
+                    mask_and_scale=mask_and_scale, config_options=config_options,
+                )
+        return self._maybe_chunk_dataset(
+            ds, chunks, filename_or_obj, config_options
+        )
 
     @staticmethod
-    def _maybe_chunk_dataset(ds, chunks, filename_or_obj):
+    def _maybe_chunk_dataset(ds, chunks, filename_or_obj, config_options=None):
         """Delegate chunking to xarray's managed path (issue #31).
 
         The backend never constructs dask collections directly: variables
@@ -757,9 +815,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         """
         if chunks is None:
             return ds
-        token = hashlib.sha256(
-            str(filename_or_obj).encode("utf-8", "replace")
-        ).hexdigest()[:16]
+        # The explicit token becomes the dask layer name and short-circuits
+        # tokenization of the wrapped arrays (issue #31), so it must carry
+        # everything that affects read results: the dsn AND the config
+        # options (issue #25) - otherwise same-dsn opens with different
+        # options would deduplicate to one graph.
+        token_src = str(filename_or_obj) + repr(sorted((config_options or {}).items()))
+        token = hashlib.sha256(token_src.encode("utf-8", "replace")).hexdigest()[:16]
         if chunks == {}:
             # Native GDAL block sizes, recorded per variable at open time
             # in encoding["preferred_chunks"]. First-wins on any dim shared
@@ -775,7 +837,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Classic-raster path
     # ------------------------------------------------------------------
 
-    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True, mask_and_scale=True):
+    def _open_raster(self, filename_or_obj, drop_variables, band_as_dim=True, mask_and_scale=True, config_options=None):
         """Open using GDAL's classic raster API."""
         logger.debug("filename_or_obj: %s", filename_or_obj)
         dataset = gdal.Open(filename_or_obj, gdal.GA_ReadOnly)
@@ -814,11 +876,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         if band_as_dim:
             ds = self._raster_as_band_dim(
-                filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale
+                filename_or_obj, dataset, drop_variables, num_bands,
+                mask_and_scale, config_options,
             )
         else:
             ds = self._raster_as_vars(
-                filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale
+                filename_or_obj, dataset, drop_variables, num_bands,
+                mask_and_scale, config_options,
             )
 
         # Spatial coords and CRS for both layouts
@@ -832,7 +896,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             ds.encoding["gdal_driver"] = driver_name
         return ds
 
-    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True):
+    def _raster_as_band_dim(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True, config_options=None):
         """Bands collapsed into a single ``band`` dimension on ``band_data``."""
         band_indices = list(range(1, num_bands + 1))
         descriptions = []
@@ -846,7 +910,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             scales.append(band.GetScale() if band.GetScale() is not None else 1.0)
             offsets.append(band.GetOffset() if band.GetOffset() is not None else 0.0)
 
-        backend_array = GDALMultiBandArray(filename_or_obj, band_indices)
+        backend_array = GDALMultiBandArray(
+            filename_or_obj, band_indices, config_options=config_options
+        )
         data = indexing.LazilyIndexedArray(backend_array)
 
         # Native block sizes for chunks={} (band chunk of 1 matches GDAL's
@@ -926,7 +992,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
         ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
         return ds
 
-    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True):
+    def _raster_as_vars(self, filename_or_obj, dataset, drop_variables, num_bands, mask_and_scale=True, config_options=None):
         """Each band as a separate (y, x) data variable."""
         data_vars = {}
 
@@ -937,7 +1003,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             if drop_variables and band_name in drop_variables:
                 continue
 
-            backend_array = GDALBackendArray(filename_or_obj, band_idx)
+            backend_array = GDALBackendArray(
+                filename_or_obj, band_idx, config_options=config_options
+            )
             logger.debug("band: %i", band_idx)
             data = indexing.LazilyIndexedArray(backend_array)
 
@@ -973,7 +1041,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
     # Multidim path
     # ------------------------------------------------------------------
 
-    def _open_multidim(self, filename_or_obj, group, drop_variables, mask_and_scale=True):
+    def _open_multidim(self, filename_or_obj, group, drop_variables, mask_and_scale=True, config_options=None):
         """Open using GDAL's multidimensional API."""
         dataset = gdal.OpenEx(filename_or_obj, gdal.OF_MULTIDIM_RASTER | gdal.GA_ReadOnly)
         if dataset is None:
@@ -1021,6 +1089,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 filename=filename_or_obj,
                 _parent_dataset=dataset,
                 _parent_group=target_group,
+                config_options=config_options,
             )
             data = indexing.LazilyIndexedArray(backend_array)
 
