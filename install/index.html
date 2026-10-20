@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -709,7 +709,8 @@ numpy 2.4.6) and ships JupyterLab.</p>
 
 ## example using venv
 apt-get update &amp;&amp; apt-get install -y python3-pip python3-venv
-python3 -m venv .venv
+# --system-site-packages: the GDAL bindings live in the system Python
+python3 -m venv --system-site-packages .venv
 . .venv/bin/activate
 pip install gdalxarray
 </code></pre>
@@ -734,7 +735,7 @@ pip install gdalxarray
 channels:
   - conda-forge
 dependencies:
-  - python&gt;=3.10
+  - python&gt;=3.11
   - gdal&gt;=3.12
   - libgdal-netcdf
   - libgdal-hdf5
@@ -806,6 +807,11 @@ Check with <code>python -c "from osgeo import gdal; print(gdal.__version__)"</co
 Mixing pip-installed GDAL with conda numpy (or vice versa) can produce
 import errors complaining about numpy ABI. Stay within a single channel
 (all conda, or all pip on top of system GDAL).</p>
+<p>gdalxarray's dependencies (via <code>rasterix</code>) require numpy 2, so the GDAL
+bindings must be built against numpy 2 as well. Some system and Docker
+GDAL builds still use numpy 1.x (e.g. <code>ghcr.io/osgeo/gdal:ubuntu-full-3.12.3</code>,
+numpy 1.26), and pip upgrading numpy there breaks <code>osgeo.gdal_array</code>.
+Check with <code>python -c "from osgeo import gdal_array"</code> after installing.</p>
 <h2 id="reporting-installation-problems">Reporting installation problems</h2>
 <p>If none of the above paths work for your platform, please open an issue at
 <a href="https://github.com/hypertidy/gdalxarray/issues">https://github.com/hypertidy/gdalxarray/issues</a> with:</p>
@@ -868,7 +874,7 @@ import errors complaining about numpy ABI. Stay within a single channel
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
