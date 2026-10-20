@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.5.1] - 2026-10-20
+
+### Fixed
+
+- Declared dtypes now match what GDAL returns. `Int8`, `Int64`,
+  `UInt64` and `Float16` bands/arrays were previously declared as
+  `float32` while reads returned the native type; the mapping now
+  mirrors `osgeo.gdal_array`'s.
+- A multiband raster whose bands all use NaN as nodata is no longer
+  reported as having heterogeneous nodata (NaN != NaN made every band
+  look different), so it decodes normally instead of warning and
+  staying raw.
+- Classic-raster backend arrays (`GDALBackendArray`,
+  `GDALMultiBandArray`) now pickle, dropping per-thread handles and
+  reopening lazily, as the multidim class already did. Before this,
+  `multidim=False` opens could not be shipped to distributed workers.
+- With `band_as_dim=False`, each band variable's `preferred_chunks` now
+  uses that band's own block size rather than band 1's.
+
+### Changed
+
+- `LICENSE` now holds the full Apache-2.0 text; the copyright notice
+  moved to `NOTICE`.
+- INSTALL: example environment updated to `python>=3.11`; the osgeo/gdal
+  venv recipe now uses `--system-site-packages`; added a note that the
+  GDAL bindings must be built against numpy 2.
+
 ## [0.5.0] - 2026-07-11
 
 ### Added

@@ -32,6 +32,35 @@ from xproj import CRSIndex  # noqa: F401  (registers xproj accessor)
 logger = logging.getLogger(__name__)
 
 
+# GDAL data type -> numpy type, matching what ReadAsArray returns
+# (osgeo.gdal_array's table). Newer types are looked up by name so older
+# bindings without them still import; unknown types fall back to float32.
+# Not imported from gdal_array itself: that would make an ABI-mismatched
+# numpy fail at gdalxarray import rather than at read time.
+_GDAL_NUMPY_DTYPES = {
+    getattr(gdal, f"GDT_{name}"): np_type
+    for name, np_type in (
+        ("Byte", np.uint8),
+        ("Int8", np.int8),
+        ("UInt16", np.uint16),
+        ("Int16", np.int16),
+        ("UInt32", np.uint32),
+        ("Int32", np.int32),
+        ("UInt64", np.uint64),
+        ("Int64", np.int64),
+        ("Float16", np.float16),
+        ("Float32", np.float32),
+        ("Float64", np.float64),
+        ("CInt16", np.complex64),
+        ("CInt32", np.complex64),
+        ("CFloat16", np.complex64),
+        ("CFloat32", np.complex64),
+        ("CFloat64", np.complex128),
+    )
+    if hasattr(gdal, f"GDT_{name}")
+}
+
+
 def _is_time_coord(array_name: str, attrs: dict, units: str | None) -> bool:
     """Recognise a time coordinate via CF conventions or a 'units since' string."""
     if attrs.get("axis") == "T":
@@ -189,6 +218,16 @@ class GDALBackendArray(BackendArray):
             self._local.band = self._local.ds.GetRasterBand(self.band_index)
         return self._local.band
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Per-thread handles are not picklable; reopen lazily after unpickling.
+        state["_local"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._local = threading.local()
+
     def __dask_tokenize__(self):
         return (
             type(self).__name__,
@@ -199,20 +238,7 @@ class GDALBackendArray(BackendArray):
 
     @staticmethod
     def _gdal_to_numpy_dtype(gdal_dtype):
-        dtype_map = {
-            gdal.GDT_Byte: np.uint8,
-            gdal.GDT_UInt16: np.uint16,
-            gdal.GDT_Int16: np.int16,
-            gdal.GDT_UInt32: np.uint32,
-            gdal.GDT_Int32: np.int32,
-            gdal.GDT_Float32: np.float32,
-            gdal.GDT_Float64: np.float64,
-            gdal.GDT_CInt16: np.complex64,
-            gdal.GDT_CInt32: np.complex64,
-            gdal.GDT_CFloat32: np.complex64,
-            gdal.GDT_CFloat64: np.complex128,
-        }
-        return dtype_map.get(gdal_dtype, np.float32)
+        return _GDAL_NUMPY_DTYPES.get(gdal_dtype, np.float32)
 
     @property
     def shape(self):
@@ -334,6 +360,16 @@ class GDALMultiBandArray(BackendArray):
         if not hasattr(self._local, "ds"):
             self._local.ds = gdal.Open(self.filename, gdal.GA_ReadOnly)
         return self._local.ds
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Per-thread handles are not picklable; reopen lazily after unpickling.
+        state["_local"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._local = threading.local()
 
     def __dask_tokenize__(self):
         return (
@@ -966,9 +1002,10 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         # _FillValue: scalar if all bands agree, per-band coord otherwise.
         # Skip if all bands have no nodata.
+        # np.unique collapses NaN, unlike a set of distinct float('nan') objects
         if all(n is None for n in nodatas):
             pass
-        elif len(set(n for n in nodatas if n is not None)) == 1 and None not in nodatas:
+        elif None not in nodatas and np.unique(np.array(nodatas, dtype=float)).size == 1:
             attrs["_FillValue"] = nodatas[0]
         else:
             # Mixed or partially-set. Deliberately NOT named _FillValue:
@@ -1053,7 +1090,7 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             logger.debug("band: %i", band_idx)
             data = indexing.LazilyIndexedArray(backend_array)
 
-            block_size = dataset.GetRasterBand(1).GetBlockSize()  # [x, y]
+            block_size = band.GetBlockSize()  # [x, y]
             preferred_chunks = {
                 "y": block_size[1] if block_size[1] > 0 else dataset.RasterYSize,
                 "x": block_size[0] if block_size[0] > 0 else dataset.RasterXSize,

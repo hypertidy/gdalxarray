@@ -46,7 +46,8 @@ docker run --rm -it ghcr.io/osgeo/gdal:ubuntu-small-latest bash
 
 ## example using venv
 apt-get update && apt-get install -y python3-pip python3-venv
-python3 -m venv .venv
+# --system-site-packages: the GDAL bindings live in the system Python
+python3 -m venv --system-site-packages .venv
 . .venv/bin/activate
 pip install gdalxarray
 ```
@@ -80,7 +81,7 @@ name: gdalxarray
 channels:
   - conda-forge
 dependencies:
-  - python>=3.10
+  - python>=3.11
   - gdal>=3.12
   - libgdal-netcdf
   - libgdal-hdf5
@@ -168,6 +169,12 @@ Check with `python -c "from osgeo import gdal; print(gdal.__version__)"`.
 Mixing pip-installed GDAL with conda numpy (or vice versa) can produce
 import errors complaining about numpy ABI. Stay within a single channel
 (all conda, or all pip on top of system GDAL).
+
+gdalxarray's dependencies (via `rasterix`) require numpy 2, so the GDAL
+bindings must be built against numpy 2 as well. Some system and Docker
+GDAL builds still use numpy 1.x (e.g. `ghcr.io/osgeo/gdal:ubuntu-full-3.12.3`,
+numpy 1.26), and pip upgrading numpy there breaks `osgeo.gdal_array`.
+Check with `python -c "from osgeo import gdal_array"` after installing.
 
 ## Reporting installation problems
 
