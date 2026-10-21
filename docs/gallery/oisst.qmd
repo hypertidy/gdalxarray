@@ -1,0 +1,125 @@
+---
+title: "NOAA OISST: one day, and 45 years of one day"
+description: "Daily netCDF over HTTPS and S3, and a zipped multidim VRT spanning the whole record."
+categories: [netCDF, multidim VRT, /vsizip/, /vsicurl/, /vsis3/]
+---
+
+```{python}
+#| echo: false
+from _common import *
+import matplotlib.pyplot as plt
+```
+
+NOAA's Optimum Interpolation SST v2.1 is a quarter-degree daily
+analysis from September 1981, one netCDF file per day. It is served
+by NCEI over HTTPS and mirrored on AWS Open Data.
+
+## One day over HTTPS
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("oisst-ncei")
+```
+
+```{python}
+#| error: true
+dsn = ("/vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/"
+       "v2.1/access/avhrr/202501/oisst-avhrr-v02r01.20250103.nc")
+if live("oisst-ncei"):
+    day = xr.open_dataset(dsn, engine="gdalxarray")
+    print(day)
+```
+
+```{python}
+#| echo: false
+assert dsn == store("oisst-ncei")["dsn"]
+```
+
+```{python}
+#| error: true
+#| fig-cap: "OISST v2.1 for one day, read from NCEI over /vsicurl/."
+if live("oisst-ncei"):
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    day["sst"].isel(time=0, zlev=0).plot(ax=ax, cmap="RdYlBu_r", vmin=-2, vmax=32)
+    ax.set_title(str(day.time.values[0])[:10])
+    plt.show()
+```
+
+## The same product on S3
+
+The AWS mirror is a public bucket, read anonymously. `config_options=`
+applies GDAL settings around the open and again around every later
+lazy read, so they do not need to be set process-wide:
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("oisst-aws")
+```
+
+```{python}
+#| error: true
+dsn = ("/vsis3/noaa-cdr-sea-surface-temp-optimum-interpolation-pds/"
+       "data/v2.1/avhrr/198109/oisst-avhrr-v02r01.19810930.nc")
+if live("oisst-aws"):
+    first = xr.open_dataset(dsn, engine="gdalxarray",
+                            config_options={"AWS_NO_SIGN_REQUEST": "YES", "AWS_REGION": "us-east-1"})
+    print(first["sst"].sel(lat=-42.875, lon=148.125, method="nearest").values.ravel())
+```
+
+```{python}
+#| echo: false
+assert dsn == store("oisst-aws")["dsn"]
+```
+
+## Forty-five years of one day
+
+A multidimensional VRT can stitch every daily file into one
+`(time, zlev, lat, lon)` array. Zipped, the whole record is one small
+file on a GitHub release; the VRT refers to the daily files on AWS, so
+the composition is `/vsizip/` over `/vsicurl/` for the recipe and
+`/vsis3/` for the data.
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("oisst-mdim-zip")
+```
+
+```{python}
+#| error: true
+dsn = ("/vsizip//vsicurl/https://github.com/mdsumner/xrdbi/releases/download/latest/"
+       "oisst-mdim.vrt.zip/oisst-mdim.vrt")
+if live("oisst-mdim-zip"):
+    rec = xr.open_dataset(dsn, engine="gdalxarray", config_options={"AWS_NO_SIGN_REQUEST": "YES"})
+    print(dict(rec.sizes), str(rec.time.values[0])[:10], str(rec.time.values[-1])[:10])
+```
+
+```{python}
+#| echo: false
+assert dsn == store("oisst-mdim-zip")["dsn"]
+```
+
+Each 27 June, in a one-degree box off eastern Tasmania. Only those
+days, 16 cells each, are read:
+
+```{python}
+#| error: true
+#| fig-cap: "Mean SST on 27 June each year, 43-44S 147-148E, off eastern Tasmania."
+if live("oisst-mdim-zip"):
+    t = rec.time.dt
+    box = (rec["sst"].sel(lat=slice(-44, -43), lon=slice(147, 148))
+           .isel(time=(t.month == 6) & (t.day == 27)))
+    series = box.mean(["zlev", "lat", "lon"]).load()
+    fig, ax = plt.subplots(figsize=(9, 3.5))
+    series.plot(ax=ax, marker="o")
+    ax.set_ylabel("SST (degrees C)"); ax.set_title("27 June, each year of the record")
+    plt.show()
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```

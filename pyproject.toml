@@ -55,6 +55,7 @@ dependencies = [
 # never constructs dask collections itself, chunking goes via Dataset.chunk
 dask = ["dask"]
 test = ["pytest>=7", "dask"]
+docs = ["dask", "matplotlib", "pandas", "pyyaml", "jupyter", "quartodoc", "griffe<2"]
 dev = ["pytest>=7", "ruff>=0.7", "pre-commit", "build", "hatchling"]
 
 [tool.pytest.ini_options]

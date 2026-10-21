@@ -123,3 +123,12 @@ test-reports/
 # docs
 docs/doctrees/
 .positai
+
+# Quarto
+/.quarto/
+docs/.quarto/
+docs/_site/
+docs/_fixtures/
+docs/_stores_status.json
+docs/reference/*.qmd
+docs/objects.json

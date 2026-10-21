@@ -1,0 +1,5 @@
+---
+toc: true
+---
+
+{{< include ../INSTALL.md >}}

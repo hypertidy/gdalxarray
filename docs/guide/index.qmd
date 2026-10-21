@@ -1,0 +1,33 @@
+---
+title: "Guide"
+---
+
+Each page here runs against small inputs from
+[wxylib/fixtures](https://github.com/wxylib/fixtures), a set of test
+stores kept with what GDAL itself reads from them. The fixtures are
+pinned to one commit, so the pages give the same result on every
+build, and where a fixture carries a GDAL oracle the page checks
+gdalxarray against it: if a read drifts, the site fails to build.
+
+[Open modes](modes.qmd)
+: Classic rasters with bands as a dimension or as variables, and
+  multidimensional arrays with named dimensions.
+
+[Virtual paths](virtual-paths.qmd)
+: Local files, `/vsicurl/`, `ZARR:` array and slice syntax, `NETCDF:`
+  subdatasets and `vrt://` options, all through the same call.
+
+[Byte-reference stores](byte-refs.qmd)
+: A multidimensional VRT mosaic over netCDF files, the byte table
+  behind it, and kerchunk-Parquet Zarr.
+
+[Warping](warp.qmd)
+: `gdalxarray.warp()` builds a VRT recipe; xarray opens it lazily.
+
+[Curvilinear grids](curvilinear.qmd)
+: Swaths and ocean model grids placed by 2D longitude and latitude,
+  warped by geolocation arrays.
+
+[Georeferencing conventions](conventions.qmd)
+: Which Zarr georeferencing conventions this GDAL recognises, in each
+  open mode, measured at build time.

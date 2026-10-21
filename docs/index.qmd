@@ -1,0 +1,106 @@
+---
+title: "gdalxarray"
+subtitle: "An xarray backend powered directly by GDAL"
+toc: true
+---
+
+```python
+import xarray as xr
+ds = xr.open_dataset(path_or_uri, engine="gdalxarray")
+```
+
+`gdalxarray` is a thin bridge between what GDAL can read (classic
+rasters, multidimensional arrays, and every virtual store GDAL knows
+about) and xarray's labelled-array model. It is lazy by default,
+Dask-chunked on request, and carries CRS and CF time through.
+
+Every code block on this site is run when the site is built, so what
+you see is what the current release does against the current GDAL.
+The small inputs come from
+[wxylib/fixtures](https://github.com/wxylib/fixtures), pinned to one
+commit; the larger examples in the [Gallery](gallery/index.qmd) read
+public cloud stores, listed with their permanence on the
+[Stores](stores.qmd) page.
+
+## A first look
+
+```{python}
+#| echo: false
+import sys; sys.path.insert(0, ".")
+from _common import *
+import matplotlib.pyplot as plt
+```
+
+An OISST-shaped Zarr v3 store, written by xarray, opened by GDAL's Zarr
+driver and handed to xarray:
+
+```{python}
+src = fixture("cf/oisst-like.zarr")
+ds = xr.open_dataset(src, engine="gdalxarray")
+ds
+```
+
+Nothing has been read yet beyond the metadata and the coordinate
+arrays. Selecting and plotting pulls only the chunks needed:
+
+```{python}
+#| fig-cap: "First day of the fixture, read lazily through GDAL's Zarr driver."
+sst = ds["sst"].isel(time=0, zlev=0)
+fig, ax = plt.subplots(figsize=(8, 4))
+sst.plot(ax=ax, cmap="RdYlBu_r", cbar_kwargs={"label": "sst"})
+ax.set_title(str(ds.time.values[0])[:10])
+plt.show()
+```
+
+The same call works for a netCDF on a web server, a COG in a bucket, a
+multidimensional VRT, a kerchunk-Parquet reference store or an Icechunk
+repository: only the string changes.
+
+```{python}
+ds.encoding["gdal_driver"], ds["sst"].encoding.get("preferred_chunks")
+```
+
+## Where next
+
+[Install](install.qmd)
+: GDAL comes first; `pip install gdalxarray` second.
+
+[Guide](guide/index.qmd)
+: The open modes, virtual paths, byte-reference stores, warping,
+  curvilinear grids and georeferencing conventions, each run on small
+  pinned inputs.
+
+[Gallery](gallery/index.qmd)
+: Worked examples against real cloud stores: OISST, Copernicus Marine
+  ARCO Zarr, BRAN2023, GEBCO, MUR, COP30, Icechunk.
+
+[Stores](stores.qmd)
+: Every remote store the site uses, how permanent it is, and whether
+  it answered at the last build.
+
+## Why this exists (and when to use rioxarray instead)
+
+[rioxarray](https://corteva.github.io/rioxarray/) is an accessor and
+backend built on [rasterio](https://rasterio.readthedocs.io/). For a
+single GeoTIFF or a STAC item it is the mature, well-tested choice.
+
+`gdalxarray` goes straight to `osgeo.gdal`. That matters when:
+
+- **the data is N-dimensional**: GDAL's multidimensional API is exposed
+  natively, with named dimensions, not only `(band, y, x)`;
+- **the path is a composition**: `/vsicurl/`, `/vsis3/`, `/vsizip/`,
+  `vrt://`, `ZARR:`, `NETCDF:`, classic and multidim VRT all nest;
+- **driver and codec support should track GDAL**: Zarr v3, kerchunk
+  Parquet references, Icechunk, GRIB, HDF4/5 multidim.
+
+## Status
+
+Active development; the API has settled but may change before 1.0.
+See the [Changelog](changelog.qmd) and the
+[issue tracker](https://github.com/hypertidy/gdalxarray/issues).
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```
