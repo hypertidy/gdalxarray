@@ -41,13 +41,13 @@ def _open(entry, q):
         gdal.UseExceptions()
         gdal.PushErrorHandler("CPLQuietErrorHandler")
         need = [
-            n for n in entry.get("needs", [])
+            n
+            for n in entry.get("needs", [])
             if (n.startswith("/vsi") and n not in gdal.GetFileSystemsPrefixes())
             or (not n.startswith("/vsi") and gdal.GetDriverByName(n) is None)
         ]
         if need:
-            q.put({"ok": False, "skipped": True,
-                   "error": "GDAL lacks " + ", ".join(need)})
+            q.put({"ok": False, "skipped": True, "error": "GDAL lacks " + ", ".join(need)})
             return
         if entry.get("multidim", True):
             ds = gdal.OpenEx(entry["dsn"], gdal.OF_MULTIDIM_RASTER)
@@ -56,8 +56,7 @@ def _open(entry, q):
         else:
             ds = gdal.Open(entry["dsn"])
             summary = f"{ds.RasterXSize} x {ds.RasterYSize} x {ds.RasterCount}"
-        q.put({"ok": True, "driver": ds.GetDriver().ShortName,
-               "summary": summary})
+        q.put({"ok": True, "driver": ds.GetDriver().ShortName, "summary": summary})
     except Exception as e:  # noqa: BLE001
         q.put({"ok": False, "error": str(e).splitlines()[0][:300]})
 
@@ -89,17 +88,15 @@ def main():
         if args.only and s["key"] not in args.only:
             continue
         if not s.get("used_in"):
-            status[s["key"]] = {"ok": False, "skipped": True,
-                                "error": "not used by any page"}
+            status[s["key"]] = {"ok": False, "skipped": True, "error": "not used by any page"}
             continue
         r = check(s)
-        r["checked"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        r["checked"] = dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M UTC")
         r["gdal"] = gdal.__version__
         status[s["key"]] = r
         mark = "ok  " if r["ok"] else ("skip" if r.get("skipped") else "FAIL")
         print(f"{mark} {s['key']:26s} {r.get('summary') or r.get('error', '')}")
-        if (not r["ok"] and not r.get("skipped")
-                and s.get("permanence") in ("pinned", "permanent")):
+        if not r["ok"] and not r.get("skipped") and s.get("permanence") in ("pinned", "permanent"):
             failed_hard.append(s["key"])
 
     out_file.write_text(json.dumps(status, indent=2, sort_keys=True) + "\n")
