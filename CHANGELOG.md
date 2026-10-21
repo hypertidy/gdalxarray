@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- CF-1.8 geometry containers now reach xarray in the multidim path, so a
+  vector data cube stored in netCDF decodes with `ds.xvec.decode_cf()`
+  (#11). GDAL hides 0-d arrays from its multidim listing; containers
+  (0-d arrays with a `geometry_type` attribute) are now added back, while
+  other hidden arrays such as grid-mapping variables stay hidden. The
+  geometry dimension named by the container's `variable_name` no longer
+  gets a placeholder 0..n index, which blocked decoding. Each container
+  gets a `grid_mapping` pointing at a 0-d `crs_wkt` coordinate built from
+  the SRS GDAL reports, so the decoded `GeometryIndex` carries the CRS.
+  Files without geometry containers are unchanged.
+
 ## [0.5.1] - 2026-10-20
 
 ### Fixed
