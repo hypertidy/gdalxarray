@@ -33,6 +33,7 @@ env:
 jobs:
   render:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     container:
       image: ghcr.io/hypertidy/gdal-r-python:latest
     steps:
@@ -78,12 +79,26 @@ jobs:
         run: python3 -m quartodoc build
 
       - name: Render site
+        timeout-minutes: 60
         working-directory: docs
         env:
           QUARTO_PYTHON: python3
         run: quarto render
 
+      - name: Summarise store check
+        if: always()
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          p = pathlib.Path("docs/_stores_status.json")
+          st = json.loads(p.read_text()) if p.exists() else {}
+          print("| store | ok | detail |\n|---|---|---|")
+          for k, v in sorted(st.items()):
+              print(f"| {k} | {v.get('ok')} | {v.get('summary') or v.get('error', '')} |")
+          EOF
+
       - name: Upload rendered site
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: site

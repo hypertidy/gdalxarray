@@ -45,6 +45,39 @@ os.environ.setdefault("CPL_VSIL_CURL_USE_HEAD", "NO")
 os.environ.setdefault("GDAL_HTTP_MAX_RETRY", "3")
 os.environ.setdefault("GDAL_HTTP_RETRY_DELAY", "2")
 os.environ.setdefault("PROJ_NETWORK", "OFF")
+# A remote read must fail rather than hang the whole site build.
+os.environ.setdefault("GDAL_HTTP_CONNECTTIMEOUT", "20")
+os.environ.setdefault("GDAL_HTTP_TIMEOUT", "60")
+os.environ.setdefault("GDAL_HTTP_LOW_SPEED_TIME", "30")
+os.environ.setdefault("GDAL_HTTP_LOW_SPEED_LIMIT", "1")
+
+# Per-cell wall-clock limit (seconds) for cells run under Jupyter. A cell
+# that overruns raises TimeoutError, which an `error: true` gallery cell
+# shows in place; a guide cell fails the build, as it should.
+CELL_TIMEOUT = int(os.environ.get("GDALXARRAY_DOCS_CELL_TIMEOUT", "600"))
+
+
+def _install_cell_timeout():
+    import signal
+
+    try:
+        ip = get_ipython()  # noqa: F821
+    except NameError:
+        return
+    if getattr(ip, "_gdalxarray_timeout", False):
+        return
+
+    def _alarm(signum, frame):
+        raise TimeoutError(f"cell exceeded {CELL_TIMEOUT} s")
+
+    signal.signal(signal.SIGALRM, _alarm)
+    ip.events.register("pre_run_cell", lambda *a: signal.alarm(CELL_TIMEOUT))
+    ip.events.register("post_run_cell", lambda *a: signal.alarm(0))
+    ip._gdalxarray_timeout = True
+    signal.alarm(CELL_TIMEOUT)
+
+
+_install_cell_timeout()
 
 DOCS = Path(__file__).resolve().parent
 FIXTURES_REPO = "wxylib/fixtures"
