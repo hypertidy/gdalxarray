@@ -197,13 +197,16 @@ own data model is N-dimensional with named axes:
 ## Status
 
 Active development. The API has settled but small changes are
-possible before 1.0. See [`CHANGELOG.md`](https://hypertidy.github.io/gdalxarray/changelog/) for what's
+possible before 1.0. See [`CHANGELOG.md`](https://hypertidy.github.io/gdalxarray/changelog.html) for what's
 landed and the [issue tracker](https://github.com/hypertidy/gdalxarray/issues)
 for what's next.
 
-For worked examples against real cloud-native data
-(BRAN2023 ocean reanalysis, ECMWF AIFS forecasts, CMEMS sea level,
-NOAA OISST), see [`docs/cookbook.md`](https://hypertidy.github.io/gdalxarray/cookbook/).
+The [documentation site](https://hypertidy.github.io/gdalxarray/) runs
+every example on each build: a [guide](https://hypertidy.github.io/gdalxarray/guide/)
+on small pinned test stores, checked against GDAL, and a
+[gallery](https://hypertidy.github.io/gdalxarray/gallery/) of real
+cloud-native data (NOAA OISST, Copernicus Marine Zarr, BRAN2023, GEBCO,
+MUR, COP30, Icechunk).
 
 
 ## License

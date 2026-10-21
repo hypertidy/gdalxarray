@@ -1,0 +1,112 @@
+---
+title: "Icechunk stores"
+description: "ECMWF AIFS forecasts and ERA5 from public Icechunk repositories, when GDAL is built with Icechunk support."
+categories: [Icechunk, Zarr v3, /vsis3/, weather]
+---
+
+```{python}
+#| echo: false
+from _common import *
+import matplotlib.pyplot as plt
+```
+
+[Icechunk](https://icechunk.io) is a transactional storage engine for
+Zarr. GDAL reads Icechunk repositories through `/vsiicechunk/` when
+built with it, which most packaged builds are not yet. This page runs
+only where the build has it; the store status below says whether it did
+this time.
+
+```{python}
+"/vsiicechunk/" in gdal.GetFileSystemsPrefixes()
+```
+
+## ECMWF AIFS forecasts
+
+ECMWF's AI forecast system, published by dynamical.org as an Icechunk
+repository on anonymous S3 (CC-BY-4.0). New initialisation times are
+appended as they are produced.
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("aifs-icechunk")
+```
+
+```{python}
+#| error: true
+dsn = "/vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk"
+cfg = {"AWS_NO_SIGN_REQUEST": "YES", "AWS_REGION": "us-west-2"}
+if live("aifs-icechunk"):
+    aifs = xr.open_dataset(dsn, engine="gdalxarray", config_options=cfg)
+    print(list(aifs.data_vars)[:8], dict(aifs.sizes))
+```
+
+```{python}
+#| echo: false
+assert dsn == store("aifs-icechunk")["dsn"]
+```
+
+The 10 m wind at Hobart through the first forecast:
+
+```{python}
+#| error: true
+#| fig-cap: "AIFS 10 m wind components at Hobart for the first initialisation in the store."
+if live("aifs-icechunk"):
+    pt = dict(latitude=-42.9, longitude=147.3, method="nearest")
+    u = aifs["wind_u_10m"].isel(init_time=0).sel(**pt)
+    v = aifs["wind_v_10m"].isel(init_time=0).sel(**pt)
+    fig, ax = plt.subplots(figsize=(9, 3.2))
+    u.plot(ax=ax, label="u"); v.plot(ax=ax, label="v"); ax.legend()
+    plt.show()
+```
+
+A single 2D face of the 4D array, as a classic raster any GDAL tool can
+use: `:{0}:{0}` fixes `init_time` and `lead_time`.
+
+```{python}
+#| error: true
+if live("aifs-icechunk"):
+    face = xr.open_dataset(
+        'ZARR:"/vsiicechunk/{/vsis3/dynamical-ecmwf-aifs-single/'
+        'ecmwf-aifs-single-forecast/v0.1.0.icechunk}":/wind_u_10m:{0}:{0}',
+        engine="gdalxarray", multidim=False, config_options=cfg)
+    print(face["band_data"].shape)
+```
+
+## ERA5, partly readable
+
+Earthmover's ERA5 Icechunk repository opens, and its coordinates read,
+but its data variables use the `pcodec` codec, which GDAL does not
+decode yet. The read below shows the error GDAL gives; when GDAL gains
+the codec, this cell starts producing values with no change here.
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("era5-icechunk")
+```
+
+```{python}
+#| error: true
+dsn = "/vsiicechunk/{/vsis3/earthmover-icechunk-era5/icechunkV2}/pressure/spatial"
+if live("era5-icechunk"):
+    era5 = xr.open_dataset(dsn, engine="gdalxarray",
+                           config_options={"AWS_NO_SIGN_REQUEST": "YES", "AWS_REGION": "us-east-1"})
+    print(dict(era5.sizes))
+    var = list(era5.data_vars)[0]
+    try:
+        era5[var].isel({d: 0 for d in era5[var].dims}).values
+    except Exception as e:
+        print(type(e).__name__, str(e).splitlines()[0])
+```
+
+```{python}
+#| echo: false
+assert dsn == store("era5-icechunk")["dsn"]
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```

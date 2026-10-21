@@ -1,0 +1,162 @@
+# Remote stores used by the gdalxarray site.
+#
+# One entry per store. Pages refer to a store by `key`; the liveness
+# check (scripts/check_stores.py) opens each `dsn` with GDAL and writes
+# docs/_stores_status.json, which pages read to decide whether to run.
+#
+# permanence:
+#   pinned     a fixed commit or immutable object, will not change
+#   permanent  an archive the provider commits to keeping
+#   versioned  stable until the provider retires this dataset version
+#   rolling    stable address, contents change (appended or replaced)
+#   temporary  scratch or transfer location, expected to go
+#   unknown    not yet classified
+#
+# confirm: true marks an entry whose permanence is a guess that the
+# maintainer still needs to settle. `used_in: []` means the store is
+# known (it appears in wxylib or older docs) but no page reads it.
+
+stores:
+
+  # ---- NOAA OISST v2.1 ---------------------------------------------------
+  - key: oisst-ncei
+    title: NOAA OISST v2.1 daily netCDF (NCEI HTTPS)
+    dsn: /vsicurl/https://www.ncei.noaa.gov/data/sea-surface-temperature-optimum-interpolation/v2.1/access/avhrr/202501/oisst-avhrr-v02r01.20250103.nc
+    multidim: true
+    provider: NOAA NCEI
+    permanence: permanent
+    used_in: [gallery/oisst.qmd]
+
+  - key: oisst-aws
+    title: NOAA OISST v2.1 daily netCDF (NOAA Open Data on AWS)
+    dsn: /vsis3/noaa-cdr-sea-surface-temp-optimum-interpolation-pds/data/v2.1/avhrr/198109/oisst-avhrr-v02r01.19810930.nc
+    env: {AWS_NO_SIGN_REQUEST: "YES", AWS_REGION: us-east-1}
+    multidim: true
+    provider: NOAA Open Data Dissemination
+    permanence: permanent
+    used_in: [gallery/oisst.qmd]
+    source: wxylib/fixtures scripts/make_mdimrefs_oisst_198109.py
+
+  - key: oisst-mdim-zip
+    title: OISST 1981-present as one zipped multidim VRT (xrdbi release)
+    dsn: /vsizip//vsicurl/https://github.com/mdsumner/xrdbi/releases/download/latest/oisst-mdim.vrt.zip/oisst-mdim.vrt
+    env: {AWS_NO_SIGN_REQUEST: "YES"}
+    multidim: true
+    provider: mdsumner/xrdbi GitHub release tag `latest`
+    permanence: rolling
+    confirm: true
+    used_in: [gallery/oisst.qmd]
+    note: Release tag `latest` is rewritten as days are added; the VRT points at the NOAA AWS bucket.
+
+  # ---- Copernicus Marine ARCO Zarr ----------------------------------------
+  - key: cmems-sla
+    title: CMEMS DUACS L4 sea level, 0.125 degree daily (ARCO Zarr v2)
+    dsn: ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-045/arco/SEALEVEL_GLO_PHY_L4_MY_008_047/cmems_obs-sl_glo_phy-ssh_my_allsat-l4-duacs-0.125deg_P1D_202411/timeChunked.zarr"
+    multidim: true
+    provider: Copernicus Marine Service
+    permanence: versioned
+    used_in: [gallery/cmems.qmd]
+
+  - key: cmems-glorys
+    title: CMEMS GLORYS12 global physics reanalysis, 1/12 degree daily (ARCO Zarr v2)
+    dsn: ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-025/arco/GLOBAL_MULTIYEAR_PHY_001_030/cmems_mod_glo_phy_my_0.083deg_P1D-m_202311/timeChunked.zarr"
+    multidim: true
+    provider: Copernicus Marine Service
+    permanence: versioned
+    used_in: [gallery/cmems.qmd]
+    source: wxylib/docs examples/cmems/products.py
+
+  - key: cmems-ostia
+    title: CMEMS OSTIA SST reanalysis, 0.05 degree daily (ARCO Zarr v2)
+    dsn: ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-046/arco/SST_GLO_SST_L4_REP_OBSERVATIONS_010_011/METOFFICE-GLO-SST-L4-REP-OBS-SST_202003/timeChunked.zarr"
+    multidim: true
+    provider: Copernicus Marine Service
+    permanence: versioned
+    used_in: [gallery/cmems.qmd]
+    source: wxylib/docs examples/cmems/products.py
+
+  # ---- BRAN2023 ------------------------------------------------------------
+  - key: bran-virtualized-pinned
+    title: BRAN2023 ocean temp as kerchunk-Parquet Zarr (GitHub, pinned commit)
+    dsn: ZARR:"/vsicurl/https://raw.githubusercontent.com/mdsumner/virtualized/d0b9c23317d2de07c3851eb9dfc968be1761d5b8/zarr/ocean_temp.zarr"
+    multidim: true
+    needs: [Parquet]
+    provider: mdsumner/virtualized at d0b9c23; chunks on NCI THREDDS
+    permanence: pinned
+    used_in: [gallery/bran.qmd]
+    source: wxylib/fixtures
+    note: The references are pinned; the bytes they point at live on NCI THREDDS, which rate-limits.
+
+  - key: bran-pawsey-2023
+    title: BRAN2023 ocean temp 2023 kerchunk-Parquet (Pawsey aad-index)
+    dsn: vrt:///vsicurl/https://projects.pawsey.org.au/aad-index/vzarr/ocean_temp_2023.parq
+    multidim: true
+    needs: [Parquet]
+    provider: AAD on Pawsey Acacia
+    permanence: unknown
+    confirm: true
+    used_in: [gallery/bran.qmd]
+
+  - key: bran-aadc-transfer
+    title: BRAN2023 daily temp mdim VRT (AADC transfer bucket)
+    dsn: /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt
+    multidim: true
+    provider: AADC object store, credentialed
+    permanence: temporary
+    confirm: true
+    used_in: []
+    source: wxylib/fixtures scripts/oracle_bran2023_store.py
+    note: Needs AADC credentials; not usable on a public site.
+
+  # ---- Icechunk -------------------------------------------------------------
+  - key: aifs-icechunk
+    title: ECMWF AIFS single forecasts (dynamical.org Icechunk)
+    dsn: /vsis3/dynamical-ecmwf-aifs-single/ecmwf-aifs-single-forecast/v0.1.0.icechunk
+    env: {AWS_NO_SIGN_REQUEST: "YES", AWS_REGION: us-west-2}
+    multidim: true
+    needs: [/vsiicechunk/]
+    provider: dynamical.org
+    permanence: rolling
+    used_in: [gallery/icechunk.qmd]
+    note: New forecast inits are appended; v0.1.0 is the schema version.
+
+  - key: era5-icechunk
+    title: ERA5 pressure-level spatial group (Earthmover Icechunk)
+    dsn: /vsiicechunk/{/vsis3/earthmover-icechunk-era5/icechunkV2}/pressure/spatial
+    env: {AWS_NO_SIGN_REQUEST: "YES", AWS_REGION: us-east-1}
+    multidim: true
+    needs: [/vsiicechunk/]
+    provider: Earthmover public demo
+    permanence: unknown
+    confirm: true
+    used_in: [gallery/icechunk.qmd]
+    note: Data variables use the pcodec codec, which GDAL does not read yet.
+
+  # ---- COGs and VRTs --------------------------------------------------------
+  - key: gebco-pawsey
+    title: GEBCO 2024 global bathymetry COG (Pawsey idea-gebco-tif)
+    dsn: /vsicurl/https://projects.pawsey.org.au/idea-gebco-tif/GEBCO_2024.tif
+    multidim: false
+    provider: AAD on Pawsey Acacia
+    permanence: unknown
+    confirm: true
+    used_in: [gallery/cog.qmd]
+
+  - key: mur-sourcecoop
+    title: GHRSST MUR v4.1 daily SST COG (source.coop ausantarctic)
+    dsn: /vsicurl/https://s3.us-west-2.amazonaws.com/us-west-2.opendata.source.coop/ausantarctic/ghrsst-mur-v2/2024/02/01/20240201090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1_analysed_sst.tif
+    multidim: false
+    provider: AAD on source.coop
+    permanence: permanent
+    confirm: true
+    used_in: [gallery/cog.qmd]
+    source: wxylib/docs examples/cmems/products.py
+
+  - key: cop30-vrt
+    title: Copernicus DEM GLO-30 as one VRT (OpenTopography)
+    dsn: /vsicurl/https://opentopography.s3.sdsc.edu/raster/COP30/COP30_hh.vrt
+    multidim: false
+    provider: OpenTopography
+    permanence: permanent
+    used_in: [gallery/cog.qmd]
+    source: wxylib/design measurements/cop30

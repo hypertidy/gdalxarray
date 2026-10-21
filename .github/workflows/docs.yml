@@ -1,45 +1,99 @@
-# Docs publish: rebuilds and pushes to gh-pages on every push to main.
-# Uses ghcr.io/hypertidy/gdal-r-python which already has GDAL + Python
-# bindings installed, so no env-solving step is needed.
+# Docs: render the Quarto site and publish it to gh-pages.
+#
+# Every page executes on every build, so this workflow is also a test:
+#   - pull requests render the site (no deploy), and fail if any guide
+#     example or fixture check fails;
+#   - pushes to main render and deploy;
+#   - a weekly run re-renders against the current GDAL image and fails
+#     if a store marked pinned or permanent in docs/stores.yml has gone.
+#
+# Runs in ghcr.io/hypertidy/gdal-r-python, which has GDAL (with the
+# Zarr, netCDF, Parquet and, when built in, Icechunk support) and its
+# Python bindings, so no environment solving is needed.
 name: Docs
 
 on:
   push:
     branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 19 * * 0"   # Sunday 19:17 UTC (Monday morning in Hobart)
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # required so the workflow can push to gh-pages
+  contents: write   # to push gh-pages
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  QUARTO_VERSION: "1.9.38"
+
 jobs:
-  build-and-deploy:
+  render:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/hypertidy/gdal-r-python:latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Configure safe git directory
-        # GitHub Actions in a container runs as a different user than the
-        # checkout owner; tell git to trust the workspace.
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install docs deps
+      - name: Install Quarto
         run: |
-          pip install --upgrade --break-system-packages pip
-          pip install --break-system-packages mkdocs-material 'mkdocstrings[python]'
-          pip install --break-system-packages -e . --no-deps
+          python3 - <<'EOF'
+          import os, tarfile, urllib.request
+          v = os.environ["QUARTO_VERSION"]
+          url = f"https://github.com/quarto-dev/quarto-cli/releases/download/v{v}/quarto-{v}-linux-amd64.tar.gz"
+          path, _ = urllib.request.urlretrieve(url)
+          tarfile.open(path).extractall("/opt")
+          EOF
+          echo "/opt/quarto-${QUARTO_VERSION}/bin" >> "$GITHUB_PATH"
 
-      - name: Verify environment
+      - name: Install docs dependencies
         run: |
-          python -c "from osgeo import gdal; print('GDAL', gdal.__version__)"
-          python -c "import gdalxarray; print('gdalxarray', gdalxarray.__version__)"
+          pip install --break-system-packages --upgrade pip
+          pip install --break-system-packages jupyter nbclient nbformat matplotlib pandas pyyaml dask \
+            quartodoc "griffe<2"
+          pip install --break-system-packages -e .
 
-      - name: Build and deploy
-        run: mkdocs gh-deploy --force --clean
+      - name: Versions
+        run: |
+          quarto --version
+          python3 -c "from osgeo import gdal; print('GDAL', gdal.__version__); print([p for p in gdal.GetFileSystemsPrefixes() if 'ice' in p])"
+          python3 -c "import gdalxarray, xarray; print('gdalxarray', gdalxarray.__version__, 'xarray', xarray.__version__)"
+
+      - name: Check remote stores
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python3 scripts/check_stores.py --strict
+          else
+            python3 scripts/check_stores.py
+          fi
+
+      - name: Build API reference
+        working-directory: docs
+        run: python3 -m quartodoc build
+
+      - name: Render site
+        working-directory: docs
+        env:
+          QUARTO_PYTHON: python3
+        run: quarto render
+
+      - name: Upload rendered site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: docs/_site
+          retention-days: 14
+
+      - name: Deploy to gh-pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_site
+          force_orphan: true

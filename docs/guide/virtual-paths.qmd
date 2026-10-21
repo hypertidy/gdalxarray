@@ -1,0 +1,198 @@
+---
+title: "Virtual paths"
+description: "One call, many addresses: local files, /vsicurl/, ZARR: and NETCDF: syntax, vrt:// options, /vsizip/."
+---
+
+```{python}
+#| echo: false
+from _common import *
+import glob, io, zipfile
+import matplotlib.pyplot as plt
+```
+
+gdalxarray passes the string you give it to GDAL unchanged, so
+everything GDAL's virtual file systems and connection strings can
+express is available without any code in gdalxarray. This page walks
+through the common ones using fixtures, so it runs anywhere.
+
+| Prefix or syntax | What it does |
+|---|---|
+| `/vsicurl/<url>` | HTTP(S) range requests |
+| `/vsis3/<bucket>/<key>`, `/vsigs/`, `/vsiaz/` | object stores (anonymous with `AWS_NO_SIGN_REQUEST=YES`) |
+| `/vsizip/<zip>/<member>` | a member of a zip, which can itself be remote |
+| `ZARR:"<store>":/<array>[:i:j]` | one array of a Zarr store, optionally a 2D slice of it |
+| `NETCDF:"<file>":<var>` | one variable of a netCDF as a classic raster |
+| `vrt://<path>?<options>` | an inline VRT: resize, subset, assign a CRS, pick bands |
+
+## The same store, three addresses
+
+A local directory, the same directory with the explicit `ZARR:` prefix,
+and the same commit of the fixture over HTTPS all give the same
+Dataset:
+
+```{python}
+rel = "cf/oisst-like.zarr"
+addresses = {
+    "local": fixture(rel),
+    "ZARR: local": f'ZARR:"{fixture(rel)}"',
+    "ZARR: /vsicurl/": f'ZARR:"{fixture(rel, remote=True)}"',
+}
+addresses["ZARR: /vsicurl/"]
+```
+
+```{python}
+opened = {k: xr.open_dataset(v, engine="gdalxarray") for k, v in addresses.items()}
+ref = opened["local"]["sst"].isel(time=1).values
+{k: bool(np.array_equal(d["sst"].isel(time=1).values, ref, equal_nan=True)) for k, d in opened.items()}
+```
+
+```{python}
+#| echo: false
+for k, d in opened.items():
+    assert np.array_equal(d["sst"].isel(time=1).values, ref, equal_nan=True), k
+```
+
+For a remote Zarr the `ZARR:` prefix is not optional. A web server has
+no directory listing to sniff, so a bare `/vsicurl/.../store.zarr`
+does not identify as anything:
+
+```{python}
+try:
+    xr.open_dataset(fixture(rel, remote=True), engine="gdalxarray")
+except Exception as e:
+    print(type(e).__name__, str(e).splitlines()[0][:100])
+```
+
+Over `/vsicurl/`, also set `GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR` so
+GDAL does not try to list what is really a web server. This site sets
+it for every page.
+
+## A 2D face of an N-D array
+
+`ZARR:"store":/array:i:j` fixes the leading dimensions of an array to
+indices `i`, `j`, leaving a 2D raster that classic tools understand.
+Here `sst` is `(time, zlev, lat, lon)`, and `:2:0` picks the third day:
+
+```{python}
+face = xr.open_dataset(f'ZARR:"{fixture(rel)}":/sst:2:0', engine="gdalxarray", multidim=False)
+face["band_data"].dims, face["band_data"].shape
+```
+
+The stored values are identical to the multidim read of the same
+day:
+
+```{python}
+raw_face = xr.open_dataset(f'ZARR:"{fixture(rel)}":/sst:2:0', engine="gdalxarray",
+                           multidim=False, mask_and_scale=False)["band_data"].values[0]
+raw_md = xr.open_dataset(fixture(rel), engine="gdalxarray",
+                         mask_and_scale=False)["sst"].isel(time=2, zlev=0).values
+assert np.array_equal(raw_face, raw_md)
+bool(np.array_equal(raw_face, raw_md))
+```
+
+but the two models can disagree on the fill value. This store was
+written by xarray as Zarr v3, which puts the CF `_FillValue` (-999) in
+the array's attributes while the Zarr-level `fill_value` is 0. GDAL
+reports the Zarr-level value as the band or array nodata; gdalxarray's
+multidim path prefers the CF attribute, and the classic path has only
+GDAL's band value to go on:
+
+```{python}
+{"classic": face["band_data"].encoding.get("_FillValue"),
+ "multidim": opened["local"]["sst"].encoding.get("_FillValue")}
+```
+
+With mask-and-scale decoding on, the classic face therefore masks
+zeros rather than -999. Pass `mask_and_scale=False` and decode
+yourself, or prefer the multidim read, for stores written this way.
+
+## A netCDF variable, either way
+
+The OISST-shaped netCDF fixtures can be opened as a multidimensional
+dataset, or one variable as a classic raster with `NETCDF:`:
+
+```{python}
+nc = fixture("mdimrefs/nc/198109/oisst-avhrr-v02r01.19810901.nc")
+md = xr.open_dataset(nc, engine="gdalxarray")
+cl = xr.open_dataset(f'NETCDF:"{nc}":sst', engine="gdalxarray", multidim=False)
+md["sst"].dims, cl["band_data"].dims
+```
+
+The two models differ in one way worth knowing: classic mode presents
+the raster north-up (GDAL flips a south-up netCDF to give a
+conventional geotransform), while multidim keeps the storage order.
+
+```{python}
+#| fig-cap: "The same netCDF variable: multidim keeps latitude ascending as stored; classic is north-up."
+fig, axs = plt.subplots(1, 2, figsize=(10, 2.8), layout="constrained")
+axs[0].imshow(md["sst"].isel(time=0, zlev=0).values, cmap="RdYlBu_r")
+axs[0].set_title(f"multidim: lat[0] = {float(md.lat[0])}")
+axs[1].imshow(cl["band_data"].isel(band=0).values, cmap="RdYlBu_r")
+axs[1].set_title(f"classic: y[0] = {float(cl.y[0])}")
+for ax in axs:
+    ax.set_xticks([]); ax.set_yticks([])
+plt.show()
+```
+
+```{python}
+assert np.array_equal(md["sst"].isel(time=0, zlev=0).values[::-1],
+                      cl["band_data"].isel(band=0).values, equal_nan=True)
+```
+
+## Inline VRT options with `vrt://`
+
+`vrt://` wraps a source in a VRT built from URL-style options, no XML
+needed. A quarter-size average, and a window by coordinates:
+
+```{python}
+cog = fixture("cog/world-int16-deflate.tif")
+full = xr.open_dataset(cog, engine="gdalxarray", multidim=False)
+small = xr.open_dataset(f"vrt://{cog}?outsize=25%,25%&r=average", engine="gdalxarray", multidim=False)
+win = xr.open_dataset(f"vrt://{cog}?projwin=100,-10,160,-50", engine="gdalxarray", multidim=False)
+{k: d["band_data"].shape for k, d in dict(full=full, small=small, window=win).items()}
+```
+
+```{python}
+#| fig-cap: "One COG through three vrt:// recipes: as is, a quarter-size average, and a projwin."
+fig, axs = plt.subplots(1, 3, figsize=(12, 3), layout="constrained",
+                        gridspec_kw=dict(width_ratios=[2, 2, 1]))
+for ax, (name, d) in zip(axs, dict(full=full, small=small, window=win).items()):
+    d["band_data"].isel(band=0).plot(ax=ax, add_colorbar=False, cmap="cividis")
+    ax.set_title(f"{name} {d['band_data'].shape[1:]}")
+plt.show()
+```
+
+The window keeps real coordinates, so it lines up with the full
+raster:
+
+```{python}
+assert np.array_equal(win["band_data"].values,
+                      full["band_data"].sel(x=win.x, y=win.y, method="nearest").values)
+```
+
+## Inside a zip
+
+`/vsizip/` reads a member of a zip without unpacking it, and the zip
+can be on a server (`/vsizip//vsicurl/https://...`). Here the zip is
+built in memory:
+
+```{python}
+buf = io.BytesIO()
+with zipfile.ZipFile(buf, "w") as z:
+    z.writestr("day1.nc", fixture_bytes(
+        "mdimrefs/nc/198109/oisst-avhrr-v02r01.19810901.nc"))
+gdal.FileFromMemBuffer("/vsimem/days.zip", buf.getvalue())
+
+zipped = xr.open_dataset("/vsizip//vsimem/days.zip/day1.nc", engine="gdalxarray")
+bool(np.array_equal(zipped["sst"].values, md["sst"].values, equal_nan=True))
+```
+
+The [OISST gallery page](../gallery/oisst.qmd) uses the remote form: a
+zipped multidimensional VRT on GitHub releases describing 45 years of
+daily files on AWS.
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```
