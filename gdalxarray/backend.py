@@ -72,6 +72,85 @@ def _is_time_coord(array_name: str, attrs: dict, units: str | None) -> bool:
     return bool(units and " since " in units)
 
 
+def _hidden_geometry_containers(group, listed: list[str]) -> list[str]:
+    """Names of CF geometry container variables GDAL hides by default (issue #11).
+
+    A CF-1.8 geometry container is a 0-d variable whose attributes
+    (``geometry_type``, ``node_count``, ``node_coordinates``, ...) describe
+    ragged node arrays elsewhere in the file. GDAL's multidim listing omits
+    0-d arrays unless ``SHOW_ALL=YES`` is passed, so without this the
+    container never reaches xarray and ``ds.xvec.decode_cf()`` (cf_xarray)
+    cannot find it. Only containers are added back: other hidden arrays,
+    such as grid-mapping variables GDAL has folded into the SRS, stay hidden
+    so existing output is unchanged.
+    """
+    try:
+        all_names = group.GetMDArrayNames(["SHOW_ALL=YES"])
+    except (RuntimeError, TypeError):
+        return []
+    seen = set(listed)
+    found = []
+    for name in all_names or []:
+        if name in seen:
+            continue
+        try:
+            arr = group.OpenMDArray(name)
+        except RuntimeError:
+            continue
+        if arr is None or arr.GetDimensionCount() != 0:
+            continue
+        if any(a.GetName() == "geometry_type" for a in arr.GetAttributes()):
+            found.append(name)
+    return found
+
+
+def _restore_geometry_grid_mapping(group, listed, data_vars, coords) -> None:
+    """Give each CF geometry container a ``grid_mapping`` xvec can decode.
+
+    The CRS is the SRS GDAL reports on the container itself, or failing that
+    on its first node coordinate array (writers differ in which carries the
+    grid_mapping), and is written as ``crs_wkt`` on a 0-d coordinate. The
+    variable keeps the file's own grid-mapping name when the file has exactly
+    one hidden grid-mapping variable, otherwise it is called ``spatial_ref``.
+    """
+    hidden_gm = []
+    try:
+        for name in group.GetMDArrayNames(["SHOW_ALL=YES"]) or []:
+            if name in listed:
+                continue
+            arr = group.OpenMDArray(name)
+            if arr is not None and any(
+                a.GetName() == "grid_mapping_name" for a in arr.GetAttributes()
+            ):
+                hidden_gm.append(name)
+    except (RuntimeError, TypeError):
+        pass
+    gm_name = hidden_gm[0] if len(hidden_gm) == 1 else "spatial_ref"
+
+    for name, var in data_vars.items():
+        if var.ndim != 0 or "geometry_type" not in var.attrs or "grid_mapping" in var.attrs:
+            continue
+        node_coords = str(var.attrs.get("node_coordinates", "")).split()
+        srs = None
+        for candidate in [name] + node_coords[:1]:
+            try:
+                arr = group.OpenMDArray(candidate)
+            except RuntimeError:
+                arr = None
+            srs = arr.GetSpatialRef() if arr is not None else None
+            if srs is not None:
+                break
+        if srs is None:
+            continue
+        wkt = srs.ExportToWkt(["FORMAT=WKT2_2019"])
+        existing = coords.get(gm_name)
+        if existing is None:
+            coords[gm_name] = xr.DataArray(0, attrs={"crs_wkt": wkt})
+        elif getattr(existing, "attrs", {}).get("crs_wkt") != wkt:
+            continue  # name taken by a different CRS; leave this container alone
+        var.attrs["grid_mapping"] = gm_name
+
+
 def _expand_tilde(dsn):
     """Expand a leading ``~`` in a plain filesystem path (issue #33).
 
@@ -1145,9 +1224,13 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 raise ValueError(f"Group component {part!r} not found in path {group!r}")
 
         array_names = target_group.GetMDArrayNames()
+        array_names += _hidden_geometry_containers(target_group, array_names)
 
         data_vars = {}
         coords = {}
+        synthesized = set()  # dims given a placeholder np.arange index
+        geometry_dims = set()  # dims a CF geometry container will decode into
+        has_geometry = False  # any CF geometry container present
 
         for array_name in array_names:
             if drop_variables and array_name in drop_variables:
@@ -1229,6 +1312,23 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                 for dim, dim_name in zip(dims, dim_names, strict=False):
                     if dim_name not in coords and dim_name not in data_vars:
                         coords[dim_name] = np.arange(dim.GetSize())
+                        synthesized.add(dim_name)
+                if len(dim_names) == 0 and "geometry_type" in attrs:
+                    has_geometry = True
+                    if attrs.get("variable_name"):
+                        geometry_dims.add(attrs["variable_name"])
+
+        # A placeholder 0..n index on a geometry dimension would block
+        # cf_xarray from decoding the container into that coordinate (issue
+        # #11), so leave such dimensions without an index.
+        for dim_name in geometry_dims & synthesized:
+            del coords[dim_name]
+
+        # GDAL folds CF grid_mapping variables into the SRS and strips the
+        # grid_mapping attribute, which loses the CRS xvec reads when it
+        # decodes a geometry container. Restore that link for containers only.
+        if has_geometry:
+            _restore_geometry_grid_mapping(target_group, array_names, data_vars, coords)
 
         # Group-level attributes
         group_attrs = {}
