@@ -1,0 +1,21 @@
+{
+  "dataset": "GEBCO 2026 Grid",
+  "url": "https://data.source.coop/ausantarctic/gebco/GEBCO_2026.tif",
+  "stac_item": "https://data.source.coop/ausantarctic/gebco/GEBCO_2026.stac-item.json",
+  "source_metadata": {
+    "datetime": "2026-01-01T00:00:00Z"
+  },
+  "links": [],
+  "processing": "averaged to 720 x 360 (0.5 degree) through the COG overviews, int16 metres",
+  "files": {
+    "gebco-2026-0.5deg.tif": "6cbff427c99894f7575af164ae9927689c0fb2478ddf352342508286a92a7ac9"
+  },
+  "source_size": [
+    86400,
+    43200
+  ],
+  "made_with": {
+    "script": "scripts/fixtures/make_warp.py",
+    "gdal": "3.13.3"
+  }
+}

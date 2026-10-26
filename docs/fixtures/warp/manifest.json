@@ -1,0 +1,175 @@
+{
+  "gdal": "3.13.3",
+  "made": "2026-10-26",
+  "script": "scripts/fixtures/make_warp.py",
+  "cases": [
+    {
+      "name": "seaice-to-4326",
+      "source": "seaice/seaice-sh-2025-09-20.tif",
+      "crs": "EPSG:4326",
+      "geotransform": [
+        -180.0,
+        0.5,
+        0,
+        -50.0,
+        0,
+        -0.5
+      ],
+      "width": 720,
+      "height": 80,
+      "overview": "none",
+      "error_threshold": 0.125,
+      "file": "seaice-to-4326.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "seaice-to-3031",
+      "source": "seaice/seaice-sh-2025-09-20.tif",
+      "crs": "EPSG:3031",
+      "geotransform": [
+        -4000000.0,
+        25000.0,
+        0,
+        4400000.0,
+        0,
+        -25000.0
+      ],
+      "width": 320,
+      "height": 336,
+      "overview": "none",
+      "error_threshold": 0.125,
+      "file": "seaice-to-3031.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "seaice-to-4326-ovr",
+      "source": "seaice/seaice-sh-2025-09-20.tif",
+      "crs": "EPSG:4326",
+      "geotransform": [
+        -180.0,
+        2.0,
+        0,
+        -50.0,
+        0,
+        -1.0
+      ],
+      "width": 180,
+      "height": 40,
+      "overview": "auto",
+      "error_threshold": 0.125,
+      "file": "seaice-to-4326-ovr.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "gebco-to-3031",
+      "source": "gebco/gebco-2026-0.5deg.tif",
+      "crs": "EPSG:3031",
+      "geotransform": [
+        -4000000.0,
+        25000.0,
+        0,
+        4000000.0,
+        0,
+        -25000.0
+      ],
+      "width": 320,
+      "height": 320,
+      "overview": "none",
+      "error_threshold": 0.125,
+      "file": "gebco-to-3031.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "int16"
+    },
+    {
+      "name": "gebco-to-eqearth",
+      "source": "gebco/gebco-2026-0.5deg.tif",
+      "crs": "+proj=eqearth",
+      "geotransform": [
+        -17300000.0,
+        69200.0,
+        0,
+        8400000.0,
+        0,
+        -69135.8
+      ],
+      "width": 500,
+      "height": 243,
+      "overview": "none",
+      "error_threshold": 0.125,
+      "file": "gebco-to-eqearth.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "int16"
+    },
+    {
+      "name": "gebco-to-ortho-hobart",
+      "source": "gebco/gebco-2026-0.5deg.tif",
+      "crs": "+proj=ortho +lat_0=-42.9 +lon_0=147.3",
+      "geotransform": [
+        -6400000.0,
+        40000.0,
+        0,
+        6400000.0,
+        0,
+        -40000.0
+      ],
+      "width": 320,
+      "height": 320,
+      "overview": "none",
+      "error_threshold": 0.125,
+      "file": "gebco-to-ortho-hobart.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "int16"
+    },
+    {
+      "name": "gebco-to-4326-ovr",
+      "source": "gebco/gebco-2026-0.5deg.tif",
+      "crs": "EPSG:4326",
+      "geotransform": [
+        -180.0,
+        3.6,
+        0,
+        90.0,
+        0,
+        -3.6
+      ],
+      "width": 100,
+      "height": 50,
+      "overview": "auto",
+      "error_threshold": 0.125,
+      "file": "gebco-to-4326-ovr.npz",
+      "resampling": [
+        "near",
+        "bilinear",
+        "cubic"
+      ],
+      "dtype": "int16"
+    }
+  ]
+}
