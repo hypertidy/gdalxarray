@@ -50,6 +50,20 @@ SEAICE_EPSG = 3412  # NSIDC Sea Ice Polar Stereographic South (Hughes 1980 ellip
 GEBCO_YEAR = "2026"
 GEBCO_BASE = "https://data.source.coop/ausantarctic/gebco"
 GEBCO_SHAPE = (720, 360)  # 0.5 degree
+# The STAC item on source.coop carries no licence or citation, so these are
+# recorded from GEBCO's own pages (linked in provenance.json).
+GEBCO_TERMS = {
+    "license": "public domain; acknowledge the source (GEBCO Grid terms of use)",
+    "doi": "10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa",
+    "citation": (
+        "GEBCO Bathymetric Compilation Group 2026 (2026). The GEBCO_2026 Grid - a "
+        "continuous terrain model for oceans and land at 15 arc-second intervals. "
+        "NERC EDS British Oceanographic Data Centre NOC."
+    ),
+    "not_for": "navigation or any other purpose involving safety at sea",
+    "terms_url": "https://www.gebco.net/data-products/gridded-bathymetry/terms-of-use",
+    "grid_url": "https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid",
+}
 
 
 def sha256(path):
@@ -180,6 +194,14 @@ def make_gebco(tmp):
     small = gdal.Translate(
         "", src, format="MEM", width=w, height=h, resampleAlg="average", outputType=gdal.GDT_Int16
     )
+    # Translate's decimated geotransform carries float noise (a top edge of
+    # 89.99999999999999); snap it to the exact half-degree grid. With the
+    # noise, a warped VRT of this grid to south polar stereographic fails to
+    # read ("stere: Invalid latitude") where an exact 90 reads fine.
+    exact = (-180.0, 360.0 / w, 0.0, 90.0, 0.0, -180.0 / h)
+    noise = max(abs(a - b) for a, b in zip(small.GetGeoTransform(), exact, strict=True))
+    assert noise < 1e-9, small.GetGeoTransform()
+    small.SetGeoTransform(exact)
     tif = out / f"gebco-{GEBCO_YEAR}-0.5deg.tif"
     cog(small, tif)
     print(f"  gebco: {w} x {h} from {src.RasterXSize} x {src.RasterYSize}")
@@ -208,7 +230,13 @@ def make_gebco(tmp):
         "links": [
             lk for lk in stac.get("links", []) if lk.get("rel") in ("license", "cite-as", "about")
         ],
-        "processing": f"averaged to {w} x {h} (0.5 degree) through the COG overviews, int16 metres",
+        "processing": (
+            f"averaged to {w} x {h} (0.5 degree) through the COG overviews, int16 metres; "
+            "geotransform snapped to the exact half-degree grid"
+        ),
+        "publisher_terms": GEBCO_TERMS,
+        "license": GEBCO_TERMS["license"],
+        "doi": GEBCO_TERMS["doi"],
         "files": {tif.name: sha256(tif)},
         "source_size": [src.RasterXSize, src.RasterYSize],
         "made_with": {"script": "scripts/fixtures/make_warp.py", "gdal": gdal.__version__},

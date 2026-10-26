@@ -168,8 +168,10 @@ def provenance(top):
     p = data_json(f"{top}/provenance.json")
     meta = p.get("source_metadata", {})
     doi = p.get("doi") or meta.get("doi") or meta.get("sci:doi")
+    if not doi and str(meta.get("id", "")).startswith("https://doi.org/"):
+        doi = meta["id"]  # ERDDAP records the DOI as the dataset id
     lic = p.get("license") or meta.get("license")
-    bits = [p["dataset"]]
+    bits = [" ".join(p["dataset"].split())]
     if doi:
         doi = str(doi).removeprefix("https://doi.org/").removeprefix("doi:")
         bits.append(f"[doi:{doi}](https://doi.org/{doi})")
