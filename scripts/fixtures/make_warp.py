@@ -16,8 +16,9 @@ its checksum, and the licence and citation the source itself publishes
 
 Sources:
 - Sea ice: NOAA/NSIDC Climate Data Record of Passive Microwave Sea Ice
-  Concentration, version 6, southern hemisphere daily, served by NOAA
-  CoastWatch ERDDAP (dataset nsidcG02202v6sh1day).
+  Concentration, version 6 (G02202), southern hemisphere daily, the
+  original netCDF from NSIDC's open NOAA mirror (noaadata.apps.nsidc.org),
+  located through the mdsumner/aad-filelist catalogue of the collection.
 - Bathymetry: GEBCO grid, from the cloud-optimised GeoTIFF published at
   data.source.coop/ausantarctic/gebco, read through its overviews.
 
@@ -31,8 +32,6 @@ import hashlib
 import json
 import shutil
 import tempfile
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -44,7 +43,12 @@ ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "docs" / "fixtures"
 
 SEAICE_DAY = "2025-09-20"
-SEAICE_ERDDAP = "https://coastwatch.pfeg.noaa.gov/erddap/griddap/nsidcG02202v6sh1day"
+# The daily files are on NSIDC's open NOAA mirror (no login); their URLs come
+# from a catalogue of the collection, since file names carry the sensor.
+SEAICE_BASE = "https://noaadata.apps.nsidc.org/NOAA/G02202_V6/"
+SEAICE_FILELIST = (
+    "https://github.com/mdsumner/aad-filelist/releases/download/latest/cdr_sic_G02202_V6.parquet"
+)
 SEAICE_EPSG = 3412  # NSIDC Sea Ice Polar Stereographic South (Hughes 1980 ellipsoid)
 
 GEBCO_YEAR = "2026"
@@ -120,9 +124,9 @@ def cog(src_ds, path, nodata=None):
 def existing(key):
     """A fixture already built from the same source and parameters, if any.
 
-    Rebuilding re-downloads from the source, and some sources (ERDDAP)
-    refuse repeated requests from CI runners, so a matching fixture is kept
-    unless --refresh names it.
+    Rebuilding re-downloads from the source, and some servers refuse
+    repeated requests from CI runners, so a matching fixture is kept unless
+    --refresh names it.
     """
     prov_path = FIX / key / "provenance.json"
     if not prov_path.exists():
@@ -130,7 +134,9 @@ def existing(key):
     prov = json.loads(prov_path.read_text())
     if "--local" in prov.get("made_with", {}).get("script", "") or "stand-in" in prov["dataset"]:
         return None  # a --local stand-in
-    if key == "seaice" and prov.get("day") != SEAICE_DAY:
+    if key == "seaice" and (
+        prov.get("day") != SEAICE_DAY or not prov.get("url", "").startswith(SEAICE_BASE)
+    ):
         return None
     if key == "gebco" and "snapped" not in prov.get("processing", ""):
         return None
@@ -143,30 +149,58 @@ def existing(key):
     return files[0]
 
 
+def find_seaice_url(day):
+    """The NSIDC file URL for one southern-hemisphere day, from a file catalogue.
+
+    The daily file name carries the sensor (e.g. am2), which changes over the
+    record, so the URL is looked up in a catalogue of the collection rather
+    than built from a pattern.
+    """
+    import pyarrow.parquet as pq
+
+    cat = Path(tempfile.mkdtemp()) / "filelist.parquet"
+    download(SEAICE_FILELIST, cat)
+    urls = pq.read_table(cat, columns=["url"]).column("url").to_pylist()
+    ymd = day.replace("-", "")
+    hits = [u for u in urls if f"/south/daily/{day[:4]}/sic_pss25_{ymd}_" in u]
+    if len(hits) != 1:
+        raise RuntimeError(f"expected one file for {day} in {SEAICE_FILELIST}, found {hits}")
+    return hits[0]
+
+
 def make_seaice(tmp):
     out = FIX / "seaice"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
-    query = f"cdr_seaice_conc[({SEAICE_DAY}T00:00:00Z)][][]"
-    url = f"{SEAICE_ERDDAP}.nc?" + urllib.parse.quote(query, safe="()=:,")
-    nc = download(url, Path(tmp) / "seaice.nc")
-    print(f"  sea ice: {nc.stat().st_size:,} bytes from ERDDAP")
+    url = find_seaice_url(SEAICE_DAY)
+    nc = download(url, Path(tmp) / Path(url).name)
+    print(f"  sea ice: {nc.stat().st_size:,} bytes from {url}")
 
     md = gdal.OpenEx(str(nc), gdal.OF_MULTIDIM_RASTER).GetRootGroup()
     attrs = {a.GetName(): a.Read() for a in md.GetAttributes()}
     arr = md.OpenMDArray("cdr_seaice_conc")
-    dims = [d.GetName() for d in arr.GetDimensions()]
-    vals = arr.ReadAsArray()  # (time, y, x)
-    y = md.OpenMDArray("y").ReadAsArray()
-    x = md.OpenMDArray("x").ReadAsArray()
-    assert dims[-2:] == ["y", "x"], dims
-    conc = np.asarray(vals, dtype=np.float64).reshape(len(y), len(x))
+    dims = arr.GetDimensions()
+    raw = np.asarray(arr.ReadAsArray(), dtype=np.float64)
+    # the file stores packed integers: unpack with its own scale and offset
+    scale = arr.GetScale() or 1.0
+    offset = arr.GetOffset() or 0.0
+    fill = arr.GetNoDataValueAsDouble()
+    missing = raw == fill if fill is not None else np.zeros(raw.shape, bool)
+    conc = raw * scale + offset
+
+    def coord(dim):
+        iv = dim.GetIndexingVariable()
+        return np.asarray(iv.ReadAsArray(), dtype=np.float64)
+
+    y, x = coord(dims[-2]), coord(dims[-1])
+    conc = conc.reshape(len(y), len(x))
+    missing = missing.reshape(len(y), len(x))
     if y[0] < y[-1]:  # north-up
-        conc, y = conc[::-1], y[::-1]
+        conc, missing, y = conc[::-1], missing[::-1], y[::-1]
 
     # Concentration is 0..1; values above 1 are the record's flags (pole hole,
-    # lake, coast, land, missing). Keep the concentration, mask the flags.
-    flags = conc > 1
+    # lake, coast, land), and the fill value is missing. Keep concentration.
+    flags = missing | (conc > 1)
     data = np.where(flags, np.nan, conc).astype(np.float32)
 
     res = float(x[1] - x[0])
@@ -192,19 +226,21 @@ def make_seaice(tmp):
         "creator_name",
         "publisher_name",
         "summary",
-        "grid_mapping_srid",
-        "proj4",
-        "grid_mapping_GeoTransform",
+        "platform",
+        "sensor",
+        "product_version",
     )
     prov = {
-        "dataset": attrs.get("title", "NOAA/NSIDC sea ice concentration CDR"),
+        "dataset": attrs.get("title", "NOAA/NSIDC sea ice concentration CDR, version 6"),
         "day": SEAICE_DAY,
         "url": url,
+        "found_in": SEAICE_FILELIST,
         "download_sha256": sha256(nc),
         "source_metadata": {k: attrs[k] for k in keep if k in attrs},
         "processing": (
-            "cdr_seaice_conc for one day, flag values (> 1) set to NaN, written as a "
-            f"float32 COG on the source grid (EPSG:{SEAICE_EPSG}, {res:g} m)"
+            f"cdr_seaice_conc for one day, unpacked (scale {scale:g}, offset {offset:g}); "
+            "flag and fill values set to NaN; written as a float32 COG on the source "
+            f"grid (EPSG:{SEAICE_EPSG}, {res:g} m)"
         ),
         "files": {tif.name: sha256(tif)},
         "geotransform": gt,
