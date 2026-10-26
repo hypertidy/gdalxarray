@@ -101,23 +101,18 @@ if live("oisst-mdim-zip"):
 assert dsn == store("oisst-mdim-zip")["dsn"]
 ```
 
-Each 27 June, in a one-degree box off eastern Tasmania.
-
-One caution first. `isel(time=mask)` with a sparse boolean or integer
-selection is read by gdalxarray as one covering slab, from the first
-selected day to the last, and thinned in memory afterwards. Across this
-record that would open every daily file from 1982 to now to keep 45 of
-them. Selecting one day at a time keeps each read to the day it needs:
+Each 27 June, in a one-degree box off eastern Tasmania. The boolean
+selection reaches gdalxarray as a list of days, and it reads just those
+days (45 small reads), not the span from the first to the last:
 
 ```{python}
 #| error: true
 #| fig-cap: "Mean SST on 27 June each year, 43-44S 147-148E, off eastern Tasmania."
 if live("oisst-mdim-zip"):
     t = rec.time.dt
-    days = np.flatnonzero(((t.month == 6) & (t.day == 27)).values)
-    box = rec["sst"].sel(lat=slice(-44, -43), lon=slice(147, 148))
-    series = xr.concat([box.isel(time=int(i)).mean(["zlev", "lat", "lon"]).load()
-                        for i in days], "time")
+    box = (rec["sst"].sel(lat=slice(-44, -43), lon=slice(147, 148))
+           .isel(time=(t.month == 6) & (t.day == 27)))
+    series = box.mean(["zlev", "lat", "lon"]).load()
     fig, ax = plt.subplots(figsize=(9, 3.5))
     series.plot(ax=ax, marker="o")
     ax.set_ylabel("SST (degrees C)"); ax.set_title("27 June, each year of the record")
