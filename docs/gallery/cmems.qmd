@@ -1,0 +1,132 @@
+---
+title: "Copernicus Marine ARCO Zarr"
+description: "Sea level, ocean reanalysis and SST from Copernicus Marine's public Zarr v2 stores."
+categories: [Zarr v2, /vsicurl/, ocean]
+---
+
+```{python}
+#| echo: false
+from _common import *
+import matplotlib.pyplot as plt
+```
+
+Copernicus Marine serves its products as Zarr v2 with consolidated
+metadata on an S3-compatible endpoint, twice over: `timeChunked.zarr`
+(one time step, a large spatial block per chunk: good for maps) and
+`geoChunked.zarr` (many time steps, a small spatial block: good for
+time series). The buckets refuse listing, which does not matter: the
+`ZARR:` prefix tells GDAL what it is looking at, and GDAL goes from
+`.zmetadata` to chunk keys by the Zarr spec.
+
+The store URLs are versioned by dataset (`_202411`, `_202311`, ...), and
+Copernicus retires old versions, so these addresses are stable until
+the next version of each product.
+
+## Absolute dynamic topography, ten days averaged
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("cmems-sla")
+```
+
+```{python}
+#| error: true
+dsn = ('ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-045/arco/'
+       'SEALEVEL_GLO_PHY_L4_MY_008_047/cmems_obs-sl_glo_phy-ssh_my_allsat-l4-duacs-0.125deg_P1D_202411/'
+       'timeChunked.zarr"')
+if live("cmems-sla"):
+    sl = xr.open_dataset(dsn, engine="gdalxarray")
+    print(list(sl.data_vars), dict(sl.sizes))
+```
+
+```{python}
+#| echo: false
+assert dsn == store("cmems-sla")["dsn"]
+```
+
+```{python}
+#| error: true
+#| fig-cap: "Absolute dynamic topography, mean of 1-10 June 2024, Tasman Sea. Eddies of the East Australian Current."
+if live("cmems-sla"):
+    adt = (sl["adt"].sel(time=slice("2024-06-01", "2024-06-10"),
+                         latitude=slice(-48, -25), longitude=slice(145, 170))
+           .mean("time"))
+    fig, ax = plt.subplots(figsize=(7, 6))
+    adt.plot(ax=ax, cmap="RdBu_r", robust=True)
+    adt.plot.contour(ax=ax, levels=15, colors="k", linewidths=0.4)
+    ax.set_aspect(1 / np.cos(np.radians(-36)))
+    plt.show()
+```
+
+## GLORYS12 temperature through the water column
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("cmems-glorys")
+```
+
+```{python}
+#| error: true
+dsn = ('ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-025/arco/'
+       'GLOBAL_MULTIYEAR_PHY_001_030/cmems_mod_glo_phy_my_0.083deg_P1D-m_202311/timeChunked.zarr"')
+if live("cmems-glorys"):
+    gl = xr.open_dataset(dsn, engine="gdalxarray")
+    print(dict(gl["thetao"].sizes))
+```
+
+```{python}
+#| echo: false
+assert dsn == store("cmems-glorys")["dsn"]
+```
+
+A zonal section along 34S, from the coast across the current, on one
+day:
+
+```{python}
+#| error: true
+#| fig-cap: "GLORYS12 potential temperature on a section along 34S, upper 1000 m, 15 January 2010."
+if live("cmems-glorys"):
+    sec = (gl["thetao"].sel(time="2010-01-15").sel(latitude=-34, method="nearest")
+           .sel(longitude=slice(150, 165), depth=slice(0, 1000)))
+    fig, ax = plt.subplots(figsize=(9, 3.8))
+    sec.plot(ax=ax, cmap="RdYlBu_r", yincrease=False)
+    plt.show()
+```
+
+## OSTIA and GLORYS surface, side by side
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("cmems-ostia")
+```
+
+```{python}
+#| error: true
+dsn = ('ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-046/arco/'
+       'SST_GLO_SST_L4_REP_OBSERVATIONS_010_011/METOFFICE-GLO-SST-L4-REP-OBS-SST_202003/'
+       'timeChunked.zarr"')
+if live("cmems-ostia") and live("cmems-glorys"):
+    os_ = xr.open_dataset(dsn, engine="gdalxarray")
+    box = dict(latitude=slice(-40, -25), longitude=slice(147, 162))
+    a = (os_["analysed_sst"].sel(time="2010-01-15").sel(**box) - 273.15).squeeze()
+    b = gl["thetao"].sel(time="2010-01-15").isel(depth=0).sel(**box).squeeze()
+    fig, axs = plt.subplots(1, 2, figsize=(11, 4.5), sharey=True, layout="constrained")
+    a.plot(ax=axs[0], cmap="RdYlBu_r", vmin=14, vmax=27, add_colorbar=False)
+    b.plot(ax=axs[1], cmap="RdYlBu_r", vmin=14, vmax=27)
+    axs[0].set_title("OSTIA analysed SST (degrees C)"); axs[1].set_title("GLORYS12 thetao, top level")
+    plt.show()
+```
+
+```{python}
+#| echo: false
+assert dsn == store("cmems-ostia")["dsn"]
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```

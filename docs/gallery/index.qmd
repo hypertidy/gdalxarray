@@ -1,0 +1,27 @@
+---
+title: "Gallery"
+description: "Worked examples against public cloud stores."
+listing:
+  contents: "*.qmd"
+  type: table
+  fields: [title, description, categories]
+  sort: false
+  sort-ui: false
+  filter-ui: false
+---
+
+These pages read real data from public stores. They run on every
+build of the site, but each remote read is guarded: if a store does
+not answer the check made before the build, or this GDAL lacks what it
+needs (Icechunk, for instance), the page says so in a callout instead
+of failing. The [Stores](../stores.qmd) page lists every address with
+its permanence and its last result.
+
+```{python}
+#| echo: false
+#| output: asis
+from _common import *
+used = [s for s in STORES.values() if any(u.startswith("gallery/") for u in s.get("used_in", []))]
+ok = sum(live(s["key"]) for s in used)
+print(f"At this build, {ok} of {len(used)} gallery stores were live.")
+```

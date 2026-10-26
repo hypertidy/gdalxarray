@@ -1,0 +1,76 @@
+---
+title: "Stores"
+description: "Every remote store this site reads, how permanent it is, and whether it answered at the last build."
+---
+
+```{python}
+#| echo: false
+from _common import *
+import pandas as pd
+```
+
+The registry is [`docs/stores.yml`](https://github.com/hypertidy/gdalxarray/blob/main/docs/stores.yml).
+Before each build `scripts/check_stores.py` opens every store with
+GDAL (metadata only) and records the result; pages use that record to
+decide whether to run their remote cells. A weekly scheduled build
+fails if a store marked *pinned* or *permanent* stops answering.
+
+```{python}
+#| echo: false
+#| output: asis
+print("\n".join(f"- **{k}**: {v.split(': ', 1)[-1]}" for k, v in PERMANENCE.items()))
+```
+
+```{python}
+#| echo: false
+rows = []
+for s in STORES.values():
+    st = STATUS.get(s["key"], {})
+    miss = missing_capabilities(s["key"])
+    if not s.get("used_in"):
+        state = "not used"
+    elif miss:
+        state = "needs " + ", ".join(miss)
+    elif st.get("ok"):
+        state = "live"
+    elif st:
+        state = "down: " + st.get("error", "")[:60]
+    else:
+        state = "not checked"
+    rows.append({
+        "store": s["title"],
+        "permanence": s.get("permanence", "unknown") + (" (to confirm)" if s.get("confirm") else ""),
+        "provider": s.get("provider", ""),
+        "last check": state,
+        "checked": st.get("checked", ""),
+        "pages": ", ".join(u.replace(".qmd", "") for u in s.get("used_in", [])),
+    })
+pd.DataFrame(rows).style.hide(axis="index")
+```
+
+## Addresses
+
+```{python}
+#| echo: false
+#| output: asis
+for s in STORES.values():
+    print(f"**{s['title']}**  ")
+    print(f"`{s['dsn']}`  ")
+    if s.get("note"):
+        print(f"{s['note']}  ")
+    if s.get("source"):
+        print(f"Also referenced in: {s['source']}  ")
+    print()
+```
+
+## Fixtures
+
+The [Guide](guide/index.qmd) uses no remote stores except GitHub: its
+inputs are [wxylib/fixtures](https://github.com/wxylib/fixtures) at a
+pinned commit, fetched once per build.
+
+```{python}
+#| echo: false
+#| output: asis
+print(f"Pinned commit: [`{FIXTURES_SHA[:10]}`](https://github.com/wxylib/fixtures/tree/{FIXTURES_SHA}).")
+```

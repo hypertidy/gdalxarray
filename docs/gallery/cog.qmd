@@ -1,0 +1,109 @@
+---
+title: "COGs and VRTs on the web"
+description: "GEBCO bathymetry, GHRSST MUR SST and the Copernicus 30 m DEM: windows from very large rasters."
+categories: [COG, VRT, /vsicurl/, classic]
+---
+
+```{python}
+#| echo: false
+from _common import *
+import matplotlib.pyplot as plt
+```
+
+Classic mode suits single large rasters. Opening reads the header;
+selecting a window reads only the tiles under it, at the overview level
+GDAL picks for the request.
+
+## GEBCO bathymetry around Tasmania
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("gebco-pawsey")
+```
+
+```{python}
+#| error: true
+dsn = "/vsicurl/https://projects.pawsey.org.au/idea-gebco-tif/GEBCO_2024.tif"
+if live("gebco-pawsey"):
+    gebco = xr.open_dataset(dsn, engine="gdalxarray", multidim=False)
+    print(gebco["band_data"].shape, gebco["band_data"].encoding.get("preferred_chunks"))
+```
+
+```{python}
+#| echo: false
+assert dsn == store("gebco-pawsey")["dsn"]
+```
+
+```{python}
+#| error: true
+#| fig-cap: "GEBCO 2024 elevation, 140-152E, 38-46S: the shelf, the Tasman Fracture Zone and the East Tasman Plateau."
+if live("gebco-pawsey"):
+    tas = gebco["band_data"].isel(band=0).sel(x=slice(140, 152), y=slice(-38, -46))
+    fig, ax = plt.subplots(figsize=(8, 6))
+    tas.plot(ax=ax, cmap="terrain", vmin=-6000, vmax=1500)
+    ax.set_aspect(1 / np.cos(np.radians(-42)))
+    plt.show()
+```
+
+## GHRSST MUR, one day
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("mur-sourcecoop")
+```
+
+```{python}
+#| error: true
+dsn = ("/vsicurl/https://s3.us-west-2.amazonaws.com/us-west-2.opendata.source.coop/ausantarctic/"
+       "ghrsst-mur-v2/2024/02/01/20240201090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1_analysed_sst.tif")
+if live("mur-sourcecoop"):
+    mur = xr.open_dataset(dsn, engine="gdalxarray", multidim=False)
+    m = mur["band_data"].isel(band=0).sel(x=slice(147, 162), y=slice(-25, -40))
+    fig, ax = plt.subplots(figsize=(7, 6))
+    m.plot(ax=ax, cmap="RdYlBu_r", robust=True)
+    ax.set_title("MUR foundation SST, 1 February 2024"); ax.set_aspect(1 / np.cos(np.radians(-32)))
+    plt.show()
+```
+
+```{python}
+#| echo: false
+assert dsn == store("mur-sourcecoop")["dsn"]
+```
+
+## The Copernicus 30 m DEM as one VRT
+
+A VRT over every GLO-30 tile, warped on read into a local projection
+with `gdalxarray.warp`:
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("cop30-vrt")
+```
+
+```{python}
+#| error: true
+#| fig-cap: "COP30 around kunanyi / Mount Wellington, warped from longitude/latitude to UTM zone 55S at 30 m."
+dsn = "/vsicurl/https://opentopography.s3.sdsc.edu/raster/COP30/COP30_hh.vrt"
+if live("cop30-vrt"):
+    rec = gdalxarray.warp(dsn, crs="EPSG:32755", bbox=(505000, 5241000, 535000, 5266000),
+                          resolution=(30, 30), resampling="bilinear")
+    dem = xr.open_dataset(rec, engine="gdalxarray", multidim=False)["band_data"].isel(band=0)
+    fig, ax = plt.subplots(figsize=(8, 6.5))
+    dem.plot(ax=ax, cmap="gist_earth")
+    ax.set_aspect("equal")
+    plt.show()
+```
+
+```{python}
+#| echo: false
+assert dsn == store("cop30-vrt")["dsn"]
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```

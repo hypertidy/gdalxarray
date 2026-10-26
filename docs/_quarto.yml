@@ -1,0 +1,104 @@
+project:
+  type: website
+  output-dir: _site
+  pre-render: _pre_render.py
+  # Every page runs with docs/ as its working directory, so
+  # `from _common import *` works from any subfolder.
+  execute-dir: project
+  render:
+    - index.qmd
+    - install.qmd
+    - guide/*.qmd
+    - gallery/*.qmd
+    - stores.qmd
+    - reference/*.qmd
+    - changelog.qmd
+
+execute:
+  # Pages run top to bottom on every render: a broken example fails the
+  # build. Remote reads that may be down are guarded per cell (see
+  # _common.py and stores.yml).
+  freeze: false
+  echo: true
+  warning: false
+
+website:
+  title: "gdalxarray"
+  description: "An xarray backend powered directly by GDAL."
+  site-url: https://hypertidy.github.io/gdalxarray/
+  repo-url: https://github.com/hypertidy/gdalxarray
+  repo-subdir: docs
+  repo-actions: [edit, issue, source]
+  search: true
+  page-navigation: true
+  navbar:
+    left:
+      - text: Get started
+        href: index.qmd
+      - text: Install
+        href: install.qmd
+      - text: Guide
+        href: guide/index.qmd
+      - text: Gallery
+        href: gallery/index.qmd
+      - text: Stores
+        href: stores.qmd
+      - text: Reference
+        href: reference/index.qmd
+      - text: Changelog
+        href: changelog.qmd
+    right:
+      - icon: github
+        href: https://github.com/hypertidy/gdalxarray
+  sidebar:
+    - title: "Guide"
+      contents:
+        - guide/index.qmd
+        - guide/modes.qmd
+        - guide/virtual-paths.qmd
+        - guide/byte-refs.qmd
+        - guide/warp.qmd
+        - guide/curvilinear.qmd
+        - guide/conventions.qmd
+    - title: "Gallery"
+      contents:
+        - gallery/index.qmd
+        - gallery/oisst.qmd
+        - gallery/cmems.qmd
+        - gallery/bran.qmd
+        - gallery/cog.qmd
+        - gallery/icechunk.qmd
+  page-footer:
+    left: "gdalxarray: Apache-2.0"
+    right: "Built with [Quarto](https://quarto.org); examples run on every build"
+
+quartodoc:
+  package: gdalxarray
+  dir: reference
+  title: Reference
+  style: pkgdown
+  parser: numpy
+  render_interlinks: false
+  sections:
+    - title: Engine
+      desc: The xarray backend. Usually reached through `xr.open_dataset(..., engine="gdalxarray")`.
+      contents:
+        - GDALBackendEntrypoint
+    - title: Recipe builders
+      desc: Functions that build GDAL recipes (VRT strings) for the engine to open.
+      contents:
+        - warp
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    respect-user-color-scheme: true
+    css: styles.css
+    toc: true
+    code-copy: true
+    code-overflow: wrap
+    highlight-style: a11y
+    fig-format: png
+    fig-dpi: 110

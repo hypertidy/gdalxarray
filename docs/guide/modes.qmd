@@ -1,0 +1,131 @@
+---
+title: "Open modes"
+description: "Classic rasters (bands as a dimension or as variables) and multidimensional arrays."
+---
+
+```{python}
+#| echo: false
+from _common import *
+import json
+import matplotlib.pyplot as plt
+```
+
+`gdalxarray` opens a source in one of two GDAL data models, chosen by
+`multidim=`:
+
+| | `multidim=False` (classic) | `multidim=True` (default) |
+|---|---|---|
+| GDAL API | `gdal.Open`, raster bands | `gdal.OpenEx(..., OF_MULTIDIM_RASTER)`, groups and arrays |
+| Dimensions | `(band, y, x)` | whatever the source names: `time`, `depth`, `lat`, `lon`, ... |
+| Georeferencing | geotransform + CRS, as a `RasterIndex` and `CRSIndex` | coordinate arrays from the source |
+| Natural for | GeoTIFF/COG, JPEG2000, classic VRT, warped VRT | netCDF, HDF5, Zarr, GRIB, multidim VRT, Icechunk |
+
+## Classic, bands as a dimension
+
+The default for `multidim=False`: one `band_data` variable with
+dimensions `(band, y, x)`, the layout rioxarray uses.
+
+```{python}
+src = fixture("cog/utm-u16-lzw-pred2-3band.tif")
+ds = xr.open_dataset(src, engine="gdalxarray", multidim=False)
+ds
+```
+
+The cell coordinates come from the geotransform, and the CRS rides on
+the `crs` coordinate's index:
+
+```{python}
+ds.xindexes["crs"]
+```
+
+Ordinary xarray operations apply. A per-pixel mean over the bands, and
+each band on its own:
+
+```{python}
+#| fig-cap: "Three bands of a UTM zone 55S fixture (synthetic values), and their mean."
+bd = ds["band_data"]
+fig, axs = plt.subplots(1, 4, figsize=(12, 2.8), sharey=True, layout="constrained")
+for i, ax in enumerate(axs[:3]):
+    bd.isel(band=i).plot(ax=ax, add_colorbar=False, cmap="viridis")
+    ax.set_title(f"band {i + 1}")
+bd.mean("band").plot(ax=axs[3], add_colorbar=False, cmap="magma")
+axs[3].set_title("mean over band")
+for ax in axs:
+    ax.set_xlabel("x (m)"); ax.set_ylabel("")
+plt.show()
+```
+
+## Classic, bands as variables
+
+`band_as_dim=False` makes each band its own variable, named from the
+band description (or `band_N` when there is none). This suits rasters
+whose bands are different quantities.
+
+```{python}
+dsv = xr.open_dataset(src, engine="gdalxarray", multidim=False, band_as_dim=False)
+list(dsv.data_vars), dsv["band_2"].dims
+```
+
+## Multidimensional
+
+For sources with their own dimensions. The fixture below is a
+ROMS-style ocean model history file written as Zarr v3: a vertical
+`s_rho` axis, two index dimensions, 2D longitude and latitude arrays,
+and the scalar parameters of the vertical transform.
+
+```{python}
+roms = xr.open_dataset(fixture("index/roms-fan.zarr"), engine="gdalxarray")
+roms
+```
+
+Dimensions, coordinates and attributes come from the store, so
+selection reads like the model's own description:
+
+```{python}
+#| fig-cap: "Temperature on the surface level and the deepest level of the fan grid, by index."
+fig, axs = plt.subplots(1, 2, figsize=(7, 4.5), sharey=True, layout="constrained")
+for ax, k, name in [(axs[0], -1, "surface"), (axs[1], 0, "bottom")]:
+    roms["temp"].isel(s_rho=k).plot(ax=ax, cmap="RdYlBu_r", vmin=float(roms.temp.min()),
+                                     vmax=float(roms.temp.max()), add_colorbar=(k == 0))
+    ax.set_title(f"{name} (s_rho = {float(roms.s_rho[k]):.2f})")
+plt.show()
+```
+
+Placing these cells on the earth uses the 2D `lon_rho` and `lat_rho`
+arrays; see [Curvilinear grids](curvilinear.qmd).
+
+## Checked against GDAL
+
+The three Zarr fixtures in wxylib/fixtures hold the same pixels as
+three of the COGs, and their manifest lists windows whose values GDAL
+read with `osgeo.gdal`. gdalxarray must give the same numbers through
+xarray indexing, in both modes:
+
+```{python}
+man = fixture_json("zarr/manifest.json")
+rows = []
+for case in man["cases"]:
+    path = fixture("zarr/" + case["store"])
+    md = xr.open_dataset(path, engine="gdalxarray", mask_and_scale=False)[case["array"]]
+    cl = xr.open_dataset(f'ZARR:"{path}":/{case["array"]}', engine="gdalxarray",
+                         multidim=False, mask_and_scale=False)["band_data"]
+    for w in case["windows"]:
+        win = dict(y=slice(w["row"], w["row"] + w["height"]),
+                   x=slice(w["col"], w["col"] + w["width"]))
+        expect = fixture_array("zarr/" + w["file"], case["dtype"])
+        a = md.isel(**win).values
+        b = cl.isel(**win).values
+        ok_md = np.array_equal(a.ravel(), expect)
+        ok_cl = np.array_equal(b.ravel(), expect)
+        rows.append((case["store"], w["file"].rsplit("/", 1)[-1], a.shape, ok_md, ok_cl))
+        assert ok_md and ok_cl, (case["store"], w["file"])
+
+import pandas as pd
+pd.DataFrame(rows, columns=["store", "oracle window", "shape", "multidim", "classic"])
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```

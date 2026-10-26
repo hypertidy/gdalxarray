@@ -1,0 +1,96 @@
+---
+title: "BRAN2023 through kerchunk-Parquet references"
+description: "A 13 TB ocean reanalysis on NCI THREDDS, read through a few megabytes of Parquet references."
+categories: [kerchunk, Parquet, Zarr, THREDDS, ocean]
+---
+
+```{python}
+#| echo: false
+from _common import *
+import dask
+import matplotlib.pyplot as plt
+```
+
+BRAN2023, the Bluelink ocean reanalysis (CSIRO and the Bureau of
+Meteorology), is daily, 0.1 degree, 51 levels, from 1993: hundreds of
+terabytes of netCDF on NCI's THREDDS server. kerchunk references in
+Parquet describe every chunk of every file, and GDAL's Zarr driver
+reads them as one store. See [Byte-reference stores](../guide/byte-refs.qmd)
+for what such a reference table holds.
+
+THREDDS limits aggressive parallel reads. Eight threads is a safe cap:
+
+```{python}
+dask.config.set(scheduler="threads", num_workers=8)
+```
+
+## A pinned reference store
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("bran-virtualized-pinned")
+```
+
+```{python}
+#| error: true
+dsn = ('ZARR:"/vsicurl/https://raw.githubusercontent.com/mdsumner/virtualized/'
+       'd0b9c23317d2de07c3851eb9dfc968be1761d5b8/zarr/ocean_temp.zarr"')
+if live("bran-virtualized-pinned"):
+    bran = xr.open_dataset(dsn, engine="gdalxarray", drop_variables=["Time_bnds"])
+    print(bran)
+```
+
+```{python}
+#| echo: false
+assert dsn == store("bran-virtualized-pinned")["dsn"]
+```
+
+`Time` comes through as numbers here: the references carry the values
+and units of the source, and decoding them is a one-liner if they are
+not decoded already. One day's surface temperature over the Tasman
+Sea, chunked so dask reads the few chunks in parallel:
+
+```{python}
+#| error: true
+#| fig-cap: "BRAN2023 surface temperature, first day of the store, read through kerchunk references from THREDDS."
+if live("bran-virtualized-pinned"):
+    surf = (bran["temp"].isel(Time=0, st_ocean=0)
+            .sel(yt_ocean=slice(-48, -25), xt_ocean=slice(145, 170))
+            .chunk({"yt_ocean": 300, "xt_ocean": 300}).load())
+    fig, ax = plt.subplots(figsize=(7, 6))
+    surf.plot(ax=ax, cmap="RdYlBu_r")
+    ax.set_aspect(1 / np.cos(np.radians(-36)))
+    plt.show()
+```
+
+## Yearly reference stores on Pawsey
+
+The same references, one store per variable per year, hosted on
+Pawsey's object store and opened through a `vrt://` wrapper:
+
+```{python}
+#| echo: false
+#| output: asis
+status_callout("bran-pawsey-2023")
+```
+
+```{python}
+#| error: true
+dsn = "vrt:///vsicurl/https://projects.pawsey.org.au/aad-index/vzarr/ocean_temp_2023.parq"
+if live("bran-pawsey-2023"):
+    b23 = xr.open_dataset(dsn, engine="gdalxarray",
+                          drop_variables=["Time_bnds", "DT", "average_DT", "average_T1", "average_T2"])
+    print(dict(b23.sizes))
+```
+
+```{python}
+#| echo: false
+assert dsn == store("bran-pawsey-2023")["dsn"]
+```
+
+```{python}
+#| echo: false
+#| output: asis
+footer()
+```
