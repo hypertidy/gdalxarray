@@ -79,7 +79,9 @@ def tile_of(item):
     p = item["properties"]
     code = p.get("grid:code") or p.get("s2:mgrs_tile") or ""
     if not code and "mgrs:utm_zone" in p:
-        code = f"{p['mgrs:utm_zone']}{p.get('mgrs:latitude_band', '')}{p.get('mgrs:grid_square', '')}"
+        code = (
+            f"{p['mgrs:utm_zone']}{p.get('mgrs:latitude_band', '')}{p.get('mgrs:grid_square', '')}"
+        )
     return code.replace("MGRS-", "")
 
 
@@ -101,8 +103,12 @@ def find_item(item_id=None):
         res = request(f"{STAC}/search", body)
         items = [f for f in res.get("features", []) if tile_of(f) == TILE]
         if items:
-            items.sort(key=lambda f: (f["properties"].get("eo:cloud_cover", 100),
-                                      f["properties"]["datetime"]))
+            items.sort(
+                key=lambda f: (
+                    f["properties"].get("eo:cloud_cover", 100),
+                    f["properties"]["datetime"],
+                )
+            )
             return coll, items[0]
     raise RuntimeError(f"no item found ({item_id or 'search'}) in {COLLECTIONS}")
 
@@ -155,9 +161,16 @@ def main():
             href = f"https://{bucket}.s3.us-west-2.amazonaws.com/{path}"
         scale, offset, nodata = band_scaling(asset)
         one = gdal.Warp(
-            "", "/vsicurl/" + href, format="MEM", dstSRS=f"EPSG:{EPSG}",
-            outputBounds=BOUNDS, xRes=RES, yRes=RES, resampleAlg="average",
-            outputType=gdal.GDT_UInt16, srcNodata=nodata if nodata is not None else 0,
+            "",
+            "/vsicurl/" + href,
+            format="MEM",
+            dstSRS=f"EPSG:{EPSG}",
+            outputBounds=BOUNDS,
+            xRes=RES,
+            yRes=RES,
+            resampleAlg="average",
+            outputType=gdal.GDT_UInt16,
+            srcNodata=nodata if nodata is not None else 0,
             dstNodata=0,
         )
         band = mem.GetRasterBand(i)
@@ -168,26 +181,46 @@ def main():
             band.SetScale(scale)
         if offset is not None:
             band.SetOffset(offset)
-        assets[key] = {"href": href, "scale": scale, "offset": offset, "nodata": nodata,
-                       "eo:bands": asset.get("eo:bands")}
+        assets[key] = {
+            "href": href,
+            "scale": scale,
+            "offset": offset,
+            "nodata": nodata,
+            "eo:bands": asset.get("eo:bands"),
+        }
         print(f"    {key}: {href.rsplit('/', 1)[-1]}")
 
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir(parents=True)
     date = p["datetime"][:10]
     tif = OUT / f"sentinel2-hobart-{date}.tif"
-    gdal.Translate(str(tif), mem, format="COG",
-                   creationOptions=["COMPRESS=DEFLATE", "PREDICTOR=YES", "BLOCKSIZE=256",
-                                    "OVERVIEWS=AUTO", "INTERLEAVE=PIXEL"])
+    gdal.Translate(
+        str(tif),
+        mem,
+        format="COG",
+        creationOptions=[
+            "COMPRESS=DEFLATE",
+            "PREDICTOR=YES",
+            "BLOCKSIZE=256",
+            "OVERVIEWS=AUTO",
+            "INTERLEAVE=PIXEL",
+        ],
+    )
 
     prov = {
         "dataset": "Copernicus Sentinel-2 Level-2A surface reflectance",
         "day": date,
         "license": "Copernicus Sentinel data terms (free and open); "
-                   "attribution: contains modified Copernicus Sentinel data",
-        "item": {"id": item["id"], "collection": coll, "stac": f"{STAC}/collections/{coll}/items/{item['id']}",
-                 "datetime": p["datetime"], "eo:cloud_cover": p.get("eo:cloud_cover"),
-                 "platform": p.get("platform"), "tile": tile_of(item)},
+        "attribution: contains modified Copernicus Sentinel data",
+        "item": {
+            "id": item["id"],
+            "collection": coll,
+            "stac": f"{STAC}/collections/{coll}/items/{item['id']}",
+            "datetime": p["datetime"],
+            "eo:cloud_cover": p.get("eo:cloud_cover"),
+            "platform": p.get("platform"),
+            "tile": tile_of(item),
+        },
         "assets": assets,
         "bounds": list(BOUNDS),
         "crs": f"EPSG:{EPSG}",
