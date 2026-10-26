@@ -48,17 +48,12 @@ jobs:
 
       - name: Build fixtures
         shell: bash
-        env:
-          BEFORE: ${{ github.event.before }}
         run: |
-          # A push rebuilds only the fixture scripts it changed, compared
-          # with the previous push (or with main, for a new branch). A
-          # manual run rebuilds every fixture.
+          # A push rebuilds the fixture scripts this branch changes
+          # compared with main; a manual run rebuilds every fixture.
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            if [ -z "$BEFORE" ] || echo "$BEFORE" | grep -q '^0*$'; then
-              BEFORE=$(git merge-base origin/main HEAD)
-            fi
-            scripts=$(git diff --name-only "$BEFORE" HEAD -- 'scripts/fixtures/make_*.py' \
+            base=$(git merge-base origin/main HEAD)
+            scripts=$(git diff --name-only "$base" HEAD -- 'scripts/fixtures/make_*.py' \
                       | while read -r f; do [ -f "$f" ] && echo "$f"; done)
           else
             scripts=$(ls scripts/fixtures/make_*.py)
