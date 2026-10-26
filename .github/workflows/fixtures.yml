@@ -47,6 +47,7 @@ jobs:
           pip install --break-system-packages -e .
 
       - name: Build fixtures
+        shell: bash
         env:
           BEFORE: ${{ github.event.before }}
         run: |
@@ -63,11 +64,22 @@ jobs:
             scripts=$(ls scripts/fixtures/make_*.py)
           fi
           echo "rebuilding: ${scripts:-nothing}"
+          failed=0
           for s in $scripts; do
             echo "::group::$s"
-            python3 "$s"
+            set +e
+            python3 "$s" 2>&1 | tee /tmp/fixture.log
+            rc=${PIPESTATUS[0]}
+            set -e
             echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then
+              # the tail of the output as an annotation, readable via the API
+              msg=$(tail -n 20 /tmp/fixture.log | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+              echo "::error title=$s failed::$msg"
+              failed=1
+            fi
           done
+          exit $failed
 
       - name: Commit if changed
         run: |
