@@ -80,6 +80,23 @@ def render(page, timeout, extra_env=None):
     return status, time.monotonic() - t0, out
 
 
+def cell_errors(page):
+    """The final exception line of each cell that raised in a rendered page."""
+    import html
+    import re
+
+    out = DOCS / "_site" / "gallery" / f"{page}.html"
+    if not out.exists():
+        return []
+    text = html.unescape(re.sub(r"<[^>]+>", "", out.read_text()))
+    errs = []
+    for block in text.split("Traceback (most recent call last)")[1:]:
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        last = next((ln for ln in lines if re.match(r"^[A-Za-z_.]*(Error|Exception)\b", ln)), "")
+        errs.append(last[:300] or "exception (message not found)")
+    return errs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--timeout", type=int, default=300, help="seconds per page")
@@ -108,6 +125,14 @@ def main():
             if s2 != "ok":
                 broken.append(page)
                 print("\n".join(out2.splitlines()[-25:]))
+        # Gallery cells use `error: true`, so a cell that raises still renders.
+        # Count them in the output and report each as a warning annotation
+        # (readable through the API, unlike the log).
+        errs = cell_errors(page)
+        if errs:
+            note = (note + "; " if note else "") + f"{len(errs)} cell(s) raised"
+            for e in errs:
+                print(f"::warning title=gallery/{page}.qmd cell raised::{e}")
         rows.append((page, status, secs, note))
         print(f"{page:12s} {status:10s} {secs:6.0f} s  {note}", flush=True)
 
