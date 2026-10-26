@@ -19,27 +19,31 @@ such a collection as one array, without copying it:
 - a **byte-reference table** records, for every chunk of every array,
   which file holds it and at what byte offset and size; any reader that
   knows the codec can then fetch chunks directly. kerchunk's Parquet
-  references and the
-  [mdim-refs](https://github.com/wxylib/design/blob/main/specs/mdim-refs-0.2.md)
-  table are two forms of this.
+  references are one form of this; the table below is another.
 
 Both are small text or tabular artifacts that describe data rather
 than holding it.
 
 ## A mosaic of three days
 
-The fixture is three tiny netCDF4 files shaped like NOAA OISST v2.1
-daily, and a multidim VRT that `gdal mdim mosaic` wrote over them:
+Three consecutive daily files of NOAA OISST v2.1, as NOAA publishes
+them, and a multidim VRT that `gdal mdim mosaic` wrote over them:
 
 ```{python}
-vrt = fixture("mdimrefs/oisst.vrt")
+#| echo: false
+#| output: asis
+provenance("oisst")
+```
+
+```{python}
+vrt = data("oisst/oisst.vrt")
 mos = xr.open_dataset(vrt, engine="gdalxarray")
 mos
 ```
 
 ```{python}
-#| fig-cap: "The three days of the mosaic, each from its own netCDF file. Grey cells are the fill value."
-fig, axs = plt.subplots(1, 3, figsize=(12, 2.6), sharey=True, layout="constrained")
+#| fig-cap: "Sea surface temperature on each day of the mosaic, each day from its own netCDF file. Grey is land and sea ice."
+fig, axs = plt.subplots(1, 3, figsize=(13, 2.8), sharey=True, layout="constrained")
 for i, ax in enumerate(axs):
     mos["sst"].isel(time=i, zlev=0).plot(ax=ax, cmap="RdYlBu_r", vmin=-2, vmax=32,
                                           add_colorbar=(i == 2))
@@ -48,15 +52,16 @@ for i, ax in enumerate(axs):
 plt.show()
 ```
 
-`time` arrives as plain numbers here because the mosaic VRT carries
-the values but not the `units` attribute, so xarray has nothing to
-decode them with. Opening one of the source files directly gives
-decoded times; the [Virtual paths](virtual-paths.qmd) page does that.
+`time` arrives as plain numbers here because `gdal mdim mosaic` carries
+the values over but not their `units`, so xarray has nothing to decode
+them with. Opening one of the source files directly gives decoded
+times; the [Virtual paths](virtual-paths.qmd) page does that.
 
 ## The byte table
 
-The same three files, described chunk by chunk. GDAL's Parquet driver
-reads the table:
+The same three files, described chunk by chunk. The table was read
+from the files with GDAL (`MDArray.GetRawBlockInfo`) when the fixture
+was built, and GDAL's Parquet driver reads it back:
 
 ```{python}
 def read_table(path):
@@ -66,36 +71,44 @@ def read_table(path):
     cols = [defn.GetFieldDefn(i).GetName() for i in range(defn.GetFieldCount())]
     return pd.DataFrame([{c: f.GetField(c) for c in cols} for f in lyr])
 
-refs = read_table(fixture("mdimrefs/refs_sst.parquet"))
-refs.drop(columns=["data"])
+refs = read_table(data("oisst/refs_sst.parquet"))
+refs
 ```
 
-One row per chunk: the chunk's index in each dimension, the file, and
-the byte range. The codec is recorded once per array:
+One row per chunk: the chunk's index along each dimension, the file it
+lives in, its byte offset and size, and how it is encoded, as GDAL
+reports it. OISST stores each day's field as a single chunk:
 
 ```{python}
-arrays = {a["array"]: a for a in fixture_json("mdimrefs/arrays.json")["arrays"]}
-arrays["sst"]["codec"], arrays["sst"]["dtype"], arrays["sst"]["chunks"]
+tables = {t["file"]: t for t in data_json("oisst/provenance.json")["products"]["byte_tables"]}
+chunks = tables["refs_sst.parquet"]["chunks"]
+dict(zip(tables["refs_sst.parquet"]["dims"], chunks))
 ```
 
 ## Decoding a chunk by hand
 
-With the table and the codec, a chunk is a range read, a zlib inflate
-and a byte unshuffle. No netCDF library is involved:
+With a row of the table, a chunk is a range read and whatever the
+`info` column lists: here a zlib inflate and a byte unshuffle. No
+netCDF library is involved:
 
 ```{python}
 row = refs.iloc[1]
-path = fixture(row["path"].replace("/mirror/oisst/", "mdimrefs/nc/"))
-f = gdal.VSIFOpenL(path, "rb")
+info = set(x.strip() for x in row["info"].split(";"))
+print(sorted(info))
+
+f = gdal.VSIFOpenL(data("oisst/" + row["path"]), "rb")
 gdal.VSIFSeekL(f, int(row["offset"]), 0)
 raw = gdal.VSIFReadL(1, int(row["size"]), f)
 gdal.VSIFCloseL(f)
 
-inflated = zlib.decompress(raw)
-n = len(inflated) // 2
-unshuffled = np.frombuffer(inflated, np.uint8).reshape(2, n).T.copy()   # shuffle, elementsize 2
-chunk = unshuffled.view("<i2").reshape(arrays["sst"]["chunks"])
-len(raw), len(inflated), chunk.shape
+buf = zlib.decompress(raw) if "COMPRESSION=DEFLATE" in info else raw
+itemsize = 2                                              # int16
+if "FILTER=SHUFFLE" in info:                               # bytes grouped by position
+    n = len(buf) // itemsize
+    buf = np.frombuffer(buf, np.uint8).reshape(itemsize, n).T.copy().tobytes()
+order = "<" if "ENDIANNESS=LITTLE" in info else ">"
+chunk = np.frombuffer(buf, f"{order}i2").reshape(chunks)
+f"{len(raw):,} bytes on disk, {chunk.nbytes:,} bytes decoded, shape {chunk.shape}"
 ```
 
 and it matches what gdalxarray reads through the VRT, value for value:

@@ -122,6 +122,57 @@ def fixture_url(rel):
     return f"https://github.com/{FIXTURES_REPO}/tree/{FIXTURES_SHA}/{rel}"
 
 
+# ---- real-data fixtures owned by this repository (docs/fixtures) -----------
+# Small cuts of public data, each built by a script in scripts/fixtures/ that
+# records its sources in provenance.json (issue #41).
+
+DATA = DOCS / "fixtures"
+GDALXARRAY_REPO = "hypertidy/gdalxarray"
+
+
+def _data_commit(rel):
+    """The commit that last changed a fixture, so remote reads are pinned.
+
+    Needs full history (the docs workflow checks out with fetch-depth 0);
+    falls back to main.
+    """
+    import subprocess
+
+    try:
+        sha = subprocess.run(
+            ["git", "log", "-1", "--format=%H", "--", str(DATA / rel)],
+            cwd=DOCS, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return sha or "main"
+    except (OSError, subprocess.CalledProcessError):
+        return "main"
+
+
+def data(rel, remote=False):
+    """Path to a docs fixture; with remote=True, the same commit over /vsicurl/."""
+    if not remote:
+        return str(DATA / rel)
+    top = rel.split("/")[0]
+    return (
+        "/vsicurl/https://raw.githubusercontent.com/"
+        f"{GDALXARRAY_REPO}/{_data_commit(top)}/docs/fixtures/{rel}"
+    )
+
+
+def data_json(rel):
+    return json.loads((DATA / rel).read_text())
+
+
+def provenance(top):
+    """Markdown line naming a fixture's source, from its provenance.json."""
+    p = data_json(f"{top}/provenance.json")
+    days = ", ".join(s["day"] for s in p["sources"])
+    print(
+        f"Data: {p['dataset']} ([doi:{p['doi']}](https://doi.org/{p['doi']}), "
+        f"{p['license']}), days {days}; built by `{p['made_with']['script']}`."
+    )
+
+
 with open(DOCS / "stores.yml") as f:
     STORES = {s["key"]: s for s in yaml.safe_load(f)["stores"]}
 
@@ -221,6 +272,7 @@ def footer():
 __all__ = [
     "np", "xr", "gdal", "gdalxarray", "fixture", "fixture_url",
     "fixture_bytes", "fixture_json", "fixture_array", "store",
+    "data", "data_json", "provenance",
     "live", "status_callout", "versions", "footer", "missing_capabilities",
     "STORES", "STATUS", "FIXTURES_SHA", "PERMANENCE",
 ]

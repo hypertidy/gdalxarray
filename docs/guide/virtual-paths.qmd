@@ -6,14 +6,21 @@ description: "One call, many addresses: local files, /vsicurl/, ZARR: and NETCDF
 ```{python}
 #| echo: false
 from _common import *
-import glob, io, zipfile
+import io, zipfile
 import matplotlib.pyplot as plt
 ```
 
 gdalxarray passes the string you give it to GDAL unchanged, so
 everything GDAL's virtual file systems and connection strings can
 express is available without any code in gdalxarray. This page walks
-through the common ones using fixtures, so it runs anywhere.
+through the common ones using three days of real NOAA OISST v2.1 sea
+surface temperature kept with this repository, so it runs anywhere.
+
+```{python}
+#| echo: false
+#| output: asis
+provenance("oisst")
+```
 
 | Prefix or syntax | What it does |
 |---|---|
@@ -27,15 +34,15 @@ through the common ones using fixtures, so it runs anywhere.
 ## The same store, three addresses
 
 A local directory, the same directory with the explicit `ZARR:` prefix,
-and the same commit of the fixture over HTTPS all give the same
-Dataset:
+and the same store over HTTPS (this repository on GitHub, at the commit
+that last changed it) all give the same Dataset:
 
 ```{python}
-rel = "cf/oisst-like.zarr"
+rel = "oisst/oisst.zarr"
 addresses = {
-    "local": fixture(rel),
-    "ZARR: local": f'ZARR:"{fixture(rel)}"',
-    "ZARR: /vsicurl/": f'ZARR:"{fixture(rel, remote=True)}"',
+    "local": data(rel),
+    "ZARR: local": f'ZARR:"{data(rel)}"',
+    "ZARR: /vsicurl/": f'ZARR:"{data(rel, remote=True)}"',
 }
 addresses["ZARR: /vsicurl/"]
 ```
@@ -58,10 +65,16 @@ does not identify as anything:
 
 ```{python}
 try:
-    xr.open_dataset(fixture(rel, remote=True), engine="gdalxarray")
+    xr.open_dataset(data(rel, remote=True), engine="gdalxarray")
 except Exception as e:
     print(type(e).__name__, str(e).splitlines()[0][:100])
 ```
+
+For the same reason, a Zarr v3 store meant to be read over HTTP needs
+consolidated metadata (a `consolidated_metadata` entry in its root
+`zarr.json`, which xarray writes with `to_zarr(..., consolidated=True)`).
+Without it the store still opens, but with no arrays in it, because
+there is no listing to find them by.
 
 Over `/vsicurl/`, also set `GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR` so
 GDAL does not try to list what is really a web server. This site sets
@@ -74,7 +87,7 @@ indices `i`, `j`, leaving a 2D raster that classic tools understand.
 Here `sst` is `(time, zlev, lat, lon)`, and `:2:0` picks the third day:
 
 ```{python}
-face = xr.open_dataset(f'ZARR:"{fixture(rel)}":/sst:2:0', engine="gdalxarray", multidim=False)
+face = xr.open_dataset(f'ZARR:"{data(rel)}":/sst:2:0', engine="gdalxarray", multidim=False)
 face["band_data"].dims, face["band_data"].shape
 ```
 
@@ -82,37 +95,56 @@ The stored values are identical to the multidim read of the same
 day:
 
 ```{python}
-raw_face = xr.open_dataset(f'ZARR:"{fixture(rel)}":/sst:2:0', engine="gdalxarray",
+raw_face = xr.open_dataset(f'ZARR:"{data(rel)}":/sst:2:0', engine="gdalxarray",
                            multidim=False, mask_and_scale=False)["band_data"].values[0]
-raw_md = xr.open_dataset(fixture(rel), engine="gdalxarray",
+raw_md = xr.open_dataset(data(rel), engine="gdalxarray",
                          mask_and_scale=False)["sst"].isel(time=2, zlev=0).values
 assert np.array_equal(raw_face, raw_md)
 bool(np.array_equal(raw_face, raw_md))
 ```
 
-but the two models can disagree on the fill value. This store was
-written by xarray as Zarr v3, which puts the CF `_FillValue` (-999) in
-the array's attributes while the Zarr-level `fill_value` is 0. GDAL
-reports the Zarr-level value as the band or array nodata; gdalxarray's
-multidim path prefers the CF attribute, and the classic path has only
-GDAL's band value to go on:
+but the two models can disagree on the fill value. A Zarr v3 array has
+two places for one: the Zarr-level `fill_value` in its metadata, and a
+CF `_FillValue` among its attributes. Here is what xarray wrote for
+`sst`, OISST's own packing being int16 with a -999 fill:
+
+```{python}
+meta = data_json(f"{rel}/sst/zarr.json")
+{"zarr fill_value": meta["fill_value"], "CF _FillValue": meta["attributes"].get("_FillValue")}
+```
+
+GDAL reports the Zarr-level value as the band or array nodata;
+gdalxarray's multidim path prefers the CF attribute, and the classic
+path has only GDAL's band value to go on:
 
 ```{python}
 {"classic": face["band_data"].encoding.get("_FillValue"),
  "multidim": opened["local"]["sst"].encoding.get("_FillValue")}
 ```
 
-With mask-and-scale decoding on, the classic face therefore masks
-zeros rather than -999. Pass `mask_and_scale=False` and decode
-yourself, or prefer the multidim read, for stores written this way.
+```{python}
+#| echo: false
+#| output: asis
+zf, cf = meta["fill_value"], meta["attributes"].get("_FillValue")
+if cf is not None and zf != cf:
+    sf = meta["attributes"].get("scale_factor", 1)
+    print(f"So with mask-and-scale decoding on, the classic face masks {zf} "
+          f"rather than {cf}: on this data, land cells (stored as {cf}) come through "
+          f"as {cf * sf:g} degrees, and real water at exactly {zf * sf:g} degrees is "
+          "masked. Pass `mask_and_scale=False` and decode yourself, or prefer the "
+          "multidim read, for stores written this way.")
+else:
+    print("With this xarray and zarr the two agree, so both paths mask the same cells.")
+```
 
 ## A netCDF variable, either way
 
-The OISST-shaped netCDF fixtures can be opened as a multidimensional
-dataset, or one variable as a classic raster with `NETCDF:`:
+One of the daily OISST netCDF files, exactly as NOAA publishes it, can
+be opened as a multidimensional dataset, or one variable as a classic
+raster with `NETCDF:`:
 
 ```{python}
-nc = fixture("mdimrefs/nc/198109/oisst-avhrr-v02r01.19810901.nc")
+nc = data("oisst/" + data_json("oisst/provenance.json")["sources"][0]["file"])
 md = xr.open_dataset(nc, engine="gdalxarray")
 cl = xr.open_dataset(f'NETCDF:"{nc}":sst', engine="gdalxarray", multidim=False)
 md["sst"].dims, cl["band_data"].dims
@@ -179,8 +211,7 @@ built in memory:
 ```{python}
 buf = io.BytesIO()
 with zipfile.ZipFile(buf, "w") as z:
-    z.writestr("day1.nc", fixture_bytes(
-        "mdimrefs/nc/198109/oisst-avhrr-v02r01.19810901.nc"))
+    z.write(nc, "day1.nc")
 gdal.FileFromMemBuffer("/vsimem/days.zip", buf.getvalue())
 
 zipped = xr.open_dataset("/vsizip//vsimem/days.zip/day1.nc", engine="gdalxarray")

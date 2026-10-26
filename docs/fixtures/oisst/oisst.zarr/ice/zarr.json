@@ -1,0 +1,59 @@
+{
+  "shape": [
+    3,
+    1,
+    720,
+    1440
+  ],
+  "data_type": "int16",
+  "chunk_grid": {
+    "name": "regular",
+    "configuration": {
+      "chunk_shape": [
+        1,
+        1,
+        360,
+        720
+      ]
+    }
+  },
+  "chunk_key_encoding": {
+    "name": "default",
+    "configuration": {
+      "separator": "/"
+    }
+  },
+  "fill_value": 0,
+  "codecs": [
+    {
+      "name": "bytes",
+      "configuration": {
+        "endian": "little"
+      }
+    },
+    {
+      "name": "zstd",
+      "configuration": {
+        "level": 0,
+        "checksum": false
+      }
+    }
+  ],
+  "attributes": {
+    "long_name": "Sea ice concentration",
+    "valid_min": 0,
+    "valid_max": 100,
+    "add_offset": 0.0,
+    "scale_factor": 0.01,
+    "_FillValue": -999
+  },
+  "dimension_names": [
+    "time",
+    "zlev",
+    "lat",
+    "lon"
+  ],
+  "zarr_format": 3,
+  "node_type": "array",
+  "storage_transformers": []
+}

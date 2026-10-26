@@ -16,9 +16,9 @@ Dask-chunked on request, and carries CRS and CF time through.
 
 Every code block on this site is run when the site is built, so what
 you see is what the current release does against the current GDAL.
-The small inputs come from
-[wxylib/fixtures](https://github.com/wxylib/fixtures), pinned to one
-commit; the larger examples in the [Gallery](gallery/index.qmd) read
+The small inputs are cuts of real public data kept with this
+repository, each with a script that rebuilds it from its source; the
+larger examples in the [Gallery](gallery/index.qmd) read
 public cloud stores, listed with their permanence on the
 [Stores](stores.qmd) page.
 
@@ -31,11 +31,18 @@ from _common import *
 import matplotlib.pyplot as plt
 ```
 
-An OISST-shaped Zarr v3 store, written by xarray, opened by GDAL's Zarr
-driver and handed to xarray:
+Three days of NOAA's daily sea surface temperature analysis (OISST
+v2.1, a quarter degree, global), written by xarray as Zarr v3, opened
+by GDAL's Zarr driver and handed back to xarray:
 
 ```{python}
-src = fixture("cf/oisst-like.zarr")
+#| echo: false
+#| output: asis
+provenance("oisst")
+```
+
+```{python}
+src = data("oisst/oisst.zarr")
 ds = xr.open_dataset(src, engine="gdalxarray")
 ds
 ```
@@ -44,10 +51,10 @@ Nothing has been read yet beyond the metadata and the coordinate
 arrays. Selecting and plotting pulls only the chunks needed:
 
 ```{python}
-#| fig-cap: "First day of the fixture, read lazily through GDAL's Zarr driver."
+#| fig-cap: "Sea surface temperature on the first day, read lazily through GDAL's Zarr driver. White is land and sea ice."
 sst = ds["sst"].isel(time=0, zlev=0)
-fig, ax = plt.subplots(figsize=(8, 4))
-sst.plot(ax=ax, cmap="RdYlBu_r", cbar_kwargs={"label": "sst"})
+fig, ax = plt.subplots(figsize=(9, 4.4))
+sst.plot(ax=ax, cmap="RdYlBu_r", vmin=-2, vmax=32, cbar_kwargs={"label": "degrees C"})
 ax.set_title(str(ds.time.values[0])[:10])
 plt.show()
 ```

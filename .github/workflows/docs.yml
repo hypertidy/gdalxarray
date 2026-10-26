@@ -38,6 +38,8 @@ jobs:
       image: ghcr.io/hypertidy/gdal-r-python:latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # docs/_common.py pins fixture URLs to their last commit
 
       - name: Configure safe git directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
