@@ -148,6 +148,7 @@ def make_seaice(tmp):
         "files": {tif.name: sha256(tif)},
         "geotransform": gt,
         "flagged_cells": int(flags.sum()),
+        "made_with": {"script": "scripts/fixtures/make_warp.py", "gdal": gdal.__version__},
     }
     (out / "provenance.json").write_text(json.dumps(prov, indent=2, default=str) + "\n")
     return tif
@@ -200,6 +201,7 @@ def make_gebco(tmp):
         "processing": f"averaged to {w} x {h} (0.5 degree) through the COG overviews, int16 metres",
         "files": {tif.name: sha256(tif)},
         "source_size": [src.RasterXSize, src.RasterYSize],
+        "made_with": {"script": "scripts/fixtures/make_warp.py", "gdal": gdal.__version__},
     }
     (out / "provenance.json").write_text(json.dumps(prov, indent=2, default=str) + "\n")
     return tif
@@ -334,6 +336,15 @@ def main():
             d.mkdir(parents=True)
             sources[key] = d / Path(path).name
             shutil.copyfile(path, sources[key])
+            (d / "provenance.json").write_text(
+                json.dumps(
+                    {
+                        "dataset": f"local stand-in for {key} ({Path(path).name}), testing only",
+                        "made_with": {"script": "scripts/fixtures/make_warp.py --local"},
+                    }
+                )
+                + "\n"
+            )
     else:
         with tempfile.TemporaryDirectory() as tmp:
             sources = {"seaice": make_seaice(tmp), "gebco": make_gebco(tmp)}

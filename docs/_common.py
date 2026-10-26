@@ -166,11 +166,23 @@ def data_json(rel):
 def provenance(top):
     """Markdown line naming a fixture's source, from its provenance.json."""
     p = data_json(f"{top}/provenance.json")
-    days = ", ".join(s["day"] for s in p["sources"])
-    print(
-        f"Data: {p['dataset']} ([doi:{p['doi']}](https://doi.org/{p['doi']}), "
-        f"{p['license']}), days {days}; built by `{p['made_with']['script']}`."
-    )
+    meta = p.get("source_metadata", {})
+    doi = p.get("doi") or meta.get("doi") or meta.get("sci:doi")
+    lic = p.get("license") or meta.get("license")
+    bits = [p["dataset"]]
+    if doi:
+        doi = str(doi).removeprefix("https://doi.org/").removeprefix("doi:")
+        bits.append(f"[doi:{doi}](https://doi.org/{doi})")
+    if lic:
+        bits.append(f"licence: {lic}")
+    if "sources" in p:
+        bits.append("days " + ", ".join(s["day"] for s in p["sources"]))
+    elif "day" in p:
+        bits.append(f"day {p['day']}")
+    script = p.get("made_with", {}).get("script") or "scripts/fixtures/"
+    print(f"Data: {'; '.join(bits)}. Built by `{script}`; details in "
+          f"[`docs/fixtures/{top}/provenance.json`](https://github.com/{GDALXARRAY_REPO}"
+          f"/blob/main/docs/fixtures/{top}/provenance.json).")
 
 
 with open(DOCS / "stores.yml") as f:
@@ -272,7 +284,7 @@ def footer():
 __all__ = [
     "np", "xr", "gdal", "gdalxarray", "fixture", "fixture_url",
     "fixture_bytes", "fixture_json", "fixture_array", "store",
-    "data", "data_json", "provenance",
+    "data", "data_json", "provenance", "DOCS",
     "live", "status_callout", "versions", "footer", "missing_capabilities",
     "STORES", "STATUS", "FIXTURES_SHA", "PERMANENCE",
 ]
