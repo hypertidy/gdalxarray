@@ -29,7 +29,11 @@ the SHA in both files.
 `stores.yml`; `scripts/check_stores.py` opens each with GDAL and writes
 `_stores_status.json`; a page runs its remote cells only when `live(key)` is
 true, and those cells use `error: true` so a mid-read failure shows the error
-rather than breaking the build. To add one: add a `stores.yml` entry, then use
+rather than breaking the build. In CI each gallery page is rendered on its own
+by `scripts/render_gallery.py` under a hard time limit (a GDAL read blocked in
+libcurl cannot be interrupted from Python); a page that overruns is rendered
+again with its remote cells off. The gallery uses `freeze: auto`, so the full
+`quarto render` afterwards reuses those results. To add one: add a `stores.yml` entry, then use
 `status_callout(key)` and `if live(key):` in the page, with the address as a
 literal string and a hidden `assert dsn == store(key)["dsn"]`.
 
@@ -45,6 +49,7 @@ pip install -e .. "quartodoc" "griffe<2"
 
 python ../scripts/check_stores.py   # optional: without it, gallery cells skip
 python -m quartodoc build
+python ../scripts/render_gallery.py # gallery pages, one at a time, time-limited
 quarto preview
 ```
 

@@ -78,8 +78,14 @@ jobs:
         working-directory: docs
         run: python3 -m quartodoc build
 
+      - name: Execute gallery pages (one at a time, time-limited)
+        timeout-minutes: 45
+        env:
+          QUARTO_PYTHON: python3
+        run: python3 scripts/render_gallery.py --timeout 300
+
       - name: Render site
-        timeout-minutes: 60
+        timeout-minutes: 20
         working-directory: docs
         env:
           QUARTO_PYTHON: python3
