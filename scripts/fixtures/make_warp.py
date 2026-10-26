@@ -117,6 +117,32 @@ def cog(src_ds, path, nodata=None):
 # ---- sea ice ---------------------------------------------------------------
 
 
+def existing(key):
+    """A fixture already built from the same source and parameters, if any.
+
+    Rebuilding re-downloads from the source, and some sources (ERDDAP)
+    refuse repeated requests from CI runners, so a matching fixture is kept
+    unless --refresh names it.
+    """
+    prov_path = FIX / key / "provenance.json"
+    if not prov_path.exists():
+        return None
+    prov = json.loads(prov_path.read_text())
+    if "--local" in prov.get("made_with", {}).get("script", "") or "stand-in" in prov["dataset"]:
+        return None  # a --local stand-in
+    if key == "seaice" and prov.get("day") != SEAICE_DAY:
+        return None
+    if key == "gebco" and "snapped" not in prov.get("processing", ""):
+        return None
+    files = [FIX / key / f for f in prov.get("files", {})]
+    if not files or not all(f.exists() and sha256(f) == prov["files"][f.name] for f in files):
+        return None
+    if "made_with" not in prov:  # builds before the field existed
+        prov["made_with"] = {"script": "scripts/fixtures/make_warp.py", "gdal": gdal.__version__}
+        prov_path.write_text(json.dumps(prov, indent=2, default=str) + "\n")
+    return files[0]
+
+
 def make_seaice(tmp):
     out = FIX / "seaice"
     shutil.rmtree(out, ignore_errors=True)
@@ -376,6 +402,13 @@ def main():
         metavar=("SEAICE_TIF", "GEBCO_TIF"),
         help="testing only: use these rasters instead of downloading",
     )
+    ap.add_argument(
+        "--refresh",
+        nargs="*",
+        default=[],
+        metavar="SOURCE",
+        help="re-download these sources (seaice, gebco) even if a matching fixture exists",
+    )
     args = ap.parse_args()
     if args.local:
         sources = {}
@@ -396,7 +429,14 @@ def main():
             )
     else:
         with tempfile.TemporaryDirectory() as tmp:
-            sources = {"seaice": make_seaice(tmp), "gebco": make_gebco(tmp)}
+            sources = {}
+            for key, make in (("seaice", make_seaice), ("gebco", make_gebco)):
+                kept = existing(key)
+                if kept is not None and key not in args.refresh:
+                    print(f"  {key}: keeping {kept.name} (matches; --refresh {key} to rebuild)")
+                    sources[key] = kept
+                else:
+                    sources[key] = make(tmp)
     make_oracles(sources)
     total = sum(
         p.stat().st_size
