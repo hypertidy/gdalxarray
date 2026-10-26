@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0   # to see which scripts the push changed
 
       - name: Configure git
         run: |
@@ -46,8 +47,23 @@ jobs:
           pip install --break-system-packages -e .
 
       - name: Build fixtures
+        env:
+          BEFORE: ${{ github.event.before }}
         run: |
-          for s in scripts/fixtures/make_*.py; do
+          # A push rebuilds only the fixture scripts it changed, compared
+          # with the previous push (or with main, for a new branch). A
+          # manual run rebuilds every fixture.
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            if [ -z "$BEFORE" ] || echo "$BEFORE" | grep -q '^0*$'; then
+              BEFORE=$(git merge-base origin/main HEAD)
+            fi
+            scripts=$(git diff --name-only "$BEFORE" HEAD -- 'scripts/fixtures/make_*.py' \
+                      | while read -r f; do [ -f "$f" ] && echo "$f"; done)
+          else
+            scripts=$(ls scripts/fixtures/make_*.py)
+          fi
+          echo "rebuilding: ${scripts:-nothing}"
+          for s in $scripts; do
             echo "::group::$s"
             python3 "$s"
             echo "::endgroup::"
