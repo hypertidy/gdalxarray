@@ -30,7 +30,9 @@ def store(tmp_path_factory):
     path = str(tmp_path_factory.mktemp("outer") / "cube.zarr")
     ds = gdal.GetDriverByName("Zarr").CreateMultiDimensional(path)
     rg = ds.GetRootGroup()
-    dims = [rg.CreateDimension(n, None, None, s) for n, s in zip(("time", "y", "x"), SHAPE, strict=True)]
+    dims = [
+        rg.CreateDimension(n, None, None, s) for n, s in zip(("time", "y", "x"), SHAPE, strict=True)
+    ]
     for d in dims:
         coord = rg.CreateMDArray(d.GetName(), [d], gdal.ExtendedDataType.Create(gdal.GDT_Float64))
         coord.Write(np.arange(d.GetSize(), dtype=np.float64))
