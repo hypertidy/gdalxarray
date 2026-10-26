@@ -1,0 +1,64 @@
+# Fixtures: rebuild the real-data docs fixtures from their public sources
+# and commit them to the branch that changed the scripts.
+#
+# The scripts in scripts/fixtures/ download small cuts of public data
+# (see each script's docstring and the provenance.json it writes) into
+# docs/fixtures/. Runs when a script changes on a branch other than
+# main, or by hand. Pushes made with GITHUB_TOKEN do not trigger other
+# workflows, so push again (or re-run Docs) after the fixture commit.
+name: Fixtures
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "scripts/fixtures/**"
+      - ".github/workflows/fixtures.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ghcr.io/hypertidy/gdal-r-python:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Configure git
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: |
+          pip install --break-system-packages pyarrow zarr
+          pip install --break-system-packages -e .
+
+      - name: Build fixtures
+        run: |
+          for s in scripts/fixtures/make_*.py; do
+            echo "::group::$s"
+            python3 "$s"
+            echo "::endgroup::"
+          done
+
+      - name: Commit if changed
+        run: |
+          git add docs/fixtures
+          if git diff --cached --quiet; then
+            echo "fixtures unchanged"
+          else
+            git commit -m "fixtures: rebuild from public sources (scripts/fixtures)"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
