@@ -15,6 +15,23 @@
   the SRS GDAL reports, so the decoded `GeometryIndex` carries the CRS.
   Files without geometry containers are unchanged.
 
+### Changed
+
+- Sparse selections on the multidim path read only what they select.
+  The multidim array now declares `IndexingSupport.OUTER`, so an integer
+  or boolean indexer such as `isel(time=(t.month == 6) & (t.day == 27))`
+  reaches the backend instead of being widened by xarray to one covering
+  slab from the first selected index to the last. The backend groups the
+  selected indices into runs (adjacent indices, or indices in the same
+  storage block along that axis), makes one read per run, and restores
+  order and duplicates afterwards. Over a daily mosaic, one day a year
+  for 45 years is now 45 reads rather than every day in between; this is
+  the case that stalled the docs build. Selections with several array
+  axes are capped at `GDALMultiDimArray.MAX_OUTER_READS` (512) reads, by
+  collapsing the busiest axes to a covering read. Classic-raster paths
+  are unchanged (band lists were already read natively). The dask path
+  is unchanged.
+
 ## [0.5.1] - 2026-10-20
 
 ### Fixed

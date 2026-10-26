@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import itertools
 import logging
 import os
 import threading
@@ -683,10 +684,16 @@ class GDALMultiDimArray(BackendArray):
             tuple(sorted(self._config_options.items())),
         )
 
+    # Upper bound on the separate reads one outer selection may issue.
+    # Beyond it, the axes with the most runs fall back to one covering read.
+    MAX_OUTER_READS = 512
+
     def __getitem__(self, key):
-        # xarray decomposes outer/vectorized indexers (integer or boolean
-        # arrays, e.g. isel(time=ds.time.dt.month == 6)) into a covering
-        # BASIC read here plus an in-memory numpy step on its side.
+        # OUTER support: integer or boolean arrays (e.g.
+        # isel(time=ds.time.dt.month == 6)) reach _raw_indexing_method as
+        # arrays, which it reads as runs of nearby indices instead of one
+        # covering slab. Vectorized (pointwise) indexers are decomposed by
+        # xarray into an outer read here plus an in-memory numpy step.
         # Raw int/slice keys (direct use outside xarray's lazy wrappers)
         # are wrapped as BasicIndexer for backward compatibility.
         if not isinstance(key, indexing.ExplicitIndexer):
@@ -694,14 +701,103 @@ class GDALMultiDimArray(BackendArray):
         return indexing.explicit_indexing_adapter(
             key,
             self.shape,
-            indexing.IndexingSupport.BASIC,
+            indexing.IndexingSupport.OUTER,
             self._raw_indexing_method,
         )
+
+    def _runs(self, axis, uniq):
+        """Group sorted unique indices on one axis into read runs.
+
+        Neighbouring indices share a run when they are adjacent or fall in
+        the same storage block along this axis, so a run never costs a
+        block read that a per-index read would not also cost.
+        """
+        block = self._chunks[axis] if axis < len(self._chunks) else 0
+        block = block or self.shape[axis]
+        runs = []
+        lo = 0
+        for j in range(1, len(uniq) + 1):
+            if j == len(uniq) or not (
+                uniq[j] - uniq[j - 1] == 1 or uniq[j] // block == uniq[j - 1] // block
+            ):
+                runs.append((lo, j))  # positions [lo, j) in uniq
+                lo = j
+        return runs
+
+    def _read_outer(self, key):
+        """Read an outer selection with integer-array axes as runs.
+
+        Each array axis is reduced to its sorted unique indices, grouped
+        into runs (see ``_runs``); one basic read is made per combination
+        of runs across array axes, and the selected positions are taken
+        from each read. Order and duplicates are restored at the end.
+        """
+        arr_axes, uniqs, inverses, runs = [], {}, {}, {}
+        for i, k in enumerate(key):
+            if isinstance(k, np.ndarray):
+                k = np.flatnonzero(k) if k.dtype == bool else k.astype(np.int64)
+                k = np.where(k < 0, k + self.shape[i], k)
+                if k.size and (k.min() < 0 or k.max() >= self.shape[i]):
+                    raise IndexError(
+                        f"index out of bounds for dimension {i} of size {self.shape[i]}"
+                    )
+                uniqs[i], inverses[i] = np.unique(k, return_inverse=True)
+                runs[i] = self._runs(i, uniqs[i])
+                arr_axes.append(i)
+
+        # Keep the number of reads bounded: collapse the busiest axes to a
+        # single covering run until the combination count fits.
+        while int(np.prod([len(runs[i]) for i in arr_axes])) > self.MAX_OUTER_READS:
+            worst = max(arr_axes, key=lambda i: len(runs[i]))
+            runs[worst] = [(0, len(uniqs[worst]))]
+
+        # Output axes: every key axis except integer-indexed ones.
+        out_axis = {}
+        n = 0
+        for i, k in enumerate(key):
+            if not isinstance(k, int | np.integer):
+                out_axis[i] = n
+                n += 1
+
+        out = None
+        for combo in itertools.product(*(runs[i] for i in arr_axes)):
+            sub = list(key)
+            for i, (lo, hi) in zip(arr_axes, combo, strict=True):
+                sub[i] = slice(int(uniqs[i][lo]), int(uniqs[i][hi - 1]) + 1)
+            block = self._raw_indexing_method(tuple(sub))
+            place = [slice(None)] * block.ndim
+            for i, (lo, hi) in zip(arr_axes, combo, strict=True):
+                local = uniqs[i][lo:hi] - uniqs[i][lo]
+                if local.size != block.shape[out_axis[i]]:
+                    block = np.take(block, local, axis=out_axis[i])
+                place[out_axis[i]] = slice(lo, hi)
+            if out is None:
+                shape = list(block.shape)
+                for i in arr_axes:
+                    shape[out_axis[i]] = len(uniqs[i])
+                out = np.empty(shape, dtype=block.dtype)
+            out[tuple(place)] = block
+
+        for i in arr_axes:
+            inv = inverses[i]
+            if not (len(inv) == len(uniqs[i]) and np.array_equal(inv, np.arange(len(inv)))):
+                out = np.take(out, inv, axis=out_axis[i])
+        return out
 
     def _raw_indexing_method(self, key):
         """Read data from GDAL multidim array."""
         if not isinstance(key, tuple):
             key = (key,)
+
+        if any(isinstance(k, np.ndarray) for k in key):
+            if any(isinstance(k, np.ndarray) and k.size == 0 for k in key):
+                shape = [
+                    (k.size if isinstance(k, np.ndarray) else len(range(*k.indices(self.shape[i]))))
+                    for i, k in enumerate(key)
+                    if not isinstance(k, int | np.integer)
+                ]
+                return np.empty(shape, dtype=self._dtype)
+            return self._read_outer(key)
 
         starts = []
         counts = []
