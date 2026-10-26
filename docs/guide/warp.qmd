@@ -6,8 +6,17 @@ description: "gdalxarray.warp() builds a warped-VRT recipe; xarray opens it lazi
 ```{python}
 #| echo: false
 from _common import *
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
+
+sys.path.insert(0, str(DOCS.parent / "scripts" / "fixtures"))
+from make_warp import warp_direct  # the settings the pinned oracle was made with
+
+man = data_json("warp/manifest.json")
+seaice = data(next(c["source"] for c in man["cases"] if c["source"].startswith("seaice/")))
+gebco = data(next(c["source"] for c in man["cases"] if c["source"].startswith("gebco/")))
 ```
 
 `gdalxarray.warp()` wraps `gdal.Warp(..., format="VRT")` and returns
@@ -15,20 +24,28 @@ the VRT as a string. Nothing is resampled until values are read, and
 then only for the cells asked for. The recipe is a few kilobytes
 whatever the size of the source.
 
-## A polar grid to longitude and latitude
+## Antarctic sea ice to longitude and latitude
 
-The fixture is a 500 x 400 float32 COG in Antarctic Polar Stereographic
-(EPSG:3031), with nodata:
+One day of Antarctic sea-ice concentration from satellite passive
+microwave (the NOAA/NSIDC climate data record), on the grid it is
+published on: 25 km polar stereographic cells on the Hughes 1980
+ellipsoid (EPSG:3412, not the WGS84-based EPSG:3031). Land, coast and
+the pole hole are nodata.
 
 ```{python}
-polar = fixture("cog/polar-f32-zstd-bigtiff.tif")
-src = xr.open_dataset(polar, engine="gdalxarray", multidim=False)
+#| echo: false
+#| output: asis
+provenance("seaice")
+```
+
+```{python}
+src = xr.open_dataset(seaice, engine="gdalxarray", multidim=False)
 src["band_data"].shape, src.xindexes["crs"].crs.to_epsg()
 ```
 
 ```{python}
-recipe = gdalxarray.warp(polar, crs="EPSG:4326", bbox=(-180, -90, 180, -50),
-                         resolution=(0.5, 0.25), resampling="bilinear")
+recipe = gdalxarray.warp(seaice, crs="EPSG:4326", bbox=(-180, -90, 180, -50),
+                         resolution=(0.25, 0.125), resampling="bilinear")
 print(f"{len(recipe)} characters of VRT")
 print("\n".join(recipe.splitlines()[:6]))
 ```
@@ -41,42 +58,53 @@ ll["band_data"]
 ```
 
 ```{python}
-#| fig-cap: "The polar fixture as stored (left) and warped to longitude/latitude south of 50S (right)."
-fig, axs = plt.subplots(1, 2, figsize=(12, 4), layout="constrained",
-                        gridspec_kw=dict(width_ratios=[1, 1.6]))
-kw = dict(cmap="viridis", vmin=float(src.band_data.min()), vmax=float(src.band_data.max()))
+#| fig-cap: "Sea-ice concentration near the winter maximum: as stored on the NSIDC polar stereographic grid (left), and warped to longitude/latitude south of 50S on read (right). Grey is land, coast and the pole hole."
+fig, axs = plt.subplots(1, 2, figsize=(13, 4.6), layout="constrained",
+                        gridspec_kw=dict(width_ratios=[1, 1.7]))
+kw = dict(cmap="Blues_r", vmin=0, vmax=1)
 src["band_data"].isel(band=0).plot(ax=axs[0], add_colorbar=False, **kw)
-axs[0].set_aspect("equal"); axs[0].set_title("EPSG:3031, as stored")
-ll["band_data"].isel(band=0).plot(ax=axs[1], **kw)
+axs[0].set_aspect("equal"); axs[0].set_title("EPSG:3412, as stored")
+ll["band_data"].isel(band=0).plot(ax=axs[1], cbar_kwargs={"label": "concentration"}, **kw)
 axs[1].set_title("EPSG:4326, warped on read")
+for ax in axs:
+    ax.set_facecolor("0.7")
 plt.show()
 ```
 
 ## Any target the warper can express
 
-Target CRS, extent and size are all recipe parameters. The same global
-fixture in three projections, the last centred on Hobart:
+Target CRS, extent and size are all recipe parameters. Global
+bathymetry and topography, averaged to half a degree, in three
+projections, the last centred on Hobart:
 
 ```{python}
-world = fixture("cog/world-int16-deflate.tif")
+#| echo: false
+#| output: asis
+provenance("gebco")
+```
+
+```{python}
 targets = {
-    "Antarctic polar stereographic": dict(crs="EPSG:3031", bbox=(-4e6, -4e6, 4e6, 4e6), shape=(300, 300)),
+    "Antarctic polar stereographic": dict(crs="EPSG:3031", bbox=(-4e6, -4e6, 4e6, 4e6), shape=(320, 320)),
     "Equal Earth": dict(crs="+proj=eqearth", bbox=(-17.3e6, -8.4e6, 17.3e6, 8.4e6), shape=(500, 243)),
     "Orthographic over Hobart": dict(crs="+proj=ortho +lat_0=-42.9 +lon_0=147.3",
-                                     bbox=(-6.4e6, -6.4e6, 6.4e6, 6.4e6), shape=(300, 300)),
+                                     bbox=(-6.4e6, -6.4e6, 6.4e6, 6.4e6), shape=(320, 320)),
 }
-warped = {k: xr.open_dataset(gdalxarray.warp(world, resampling="bilinear", **t),
+# nodata marks cells outside a projection's domain (GEBCO itself has none)
+warped = {k: xr.open_dataset(gdalxarray.warp(gebco, resampling="bilinear", nodata=-32768, **t),
                              engine="gdalxarray", multidim=False)["band_data"].isel(band=0)
           for k, t in targets.items()}
 ```
 
 ```{python}
-#| fig-cap: "One int16 COG, three warped VRT recipes. Cells outside the projection's domain are nodata."
-fig, axs = plt.subplots(1, 3, figsize=(13, 4), layout="constrained",
+#| fig-cap: "GEBCO elevation (metres) through three warped VRT recipes: polar stereographic, Equal Earth, and an orthographic view centred on Hobart."
+fig, axs = plt.subplots(1, 3, figsize=(13, 4.2), layout="constrained",
                         gridspec_kw=dict(width_ratios=[1, 1.8, 1]))
+norm = TwoSlopeNorm(vmin=-7000, vcenter=0, vmax=4000)
 for ax, (name, da) in zip(axs, warped.items()):
-    ax.imshow(np.ma.masked_invalid(da.values), cmap="cividis")
+    im = ax.imshow(np.ma.masked_invalid(da.values), cmap="gist_earth", norm=norm)
     ax.set_title(name); ax.set_xticks([]); ax.set_yticks([])
+fig.colorbar(im, ax=axs, shrink=0.8, label="elevation (m)")
 plt.show()
 ```
 
@@ -86,51 +114,28 @@ available. [Curvilinear grids](curvilinear.qmd) uses `geoloc=True`.
 
 ## Checked against GDAL
 
-wxylib/fixtures carries what `gdal.Warp` wrote for a set of target
-grids over these COGs (into in-memory datasets, single-threaded, error
-threshold 0.125). For each case this page compares:
+`scripts/fixtures/make_warp.py` defines target grids over these two
+sources (lon/lat, WGS84 polar stereographic, Equal Earth, orthographic,
+and two coarse cases where GDAL reads an overview) and records what
+`gdal.Warp` writes for each: into memory, single-threaded, error
+threshold 0.125. For each case this page compares:
 
 - **gdalxarray**: `gdalxarray.warp()` opened with xarray;
 - **GDAL VRT**: the same warped VRT read by GDAL itself
   (`gdal.Warp(format="VRT")` then `ReadAsArray`);
-- **GDAL direct**: `gdal.Warp` into memory with the fixture's settings,
-  using the GDAL this page was built with;
-- **pinned**: the fixture's recorded result, from the GDAL version in
-  its manifest.
+- **GDAL direct**: `gdal.Warp` into memory with the same settings as the
+  recorded case, using the GDAL this page was built with;
+- **pinned**: the recorded result, from the GDAL version in the
+  manifest.
 
 gdalxarray must agree with the GDAL VRT on every cell: that is the
 claim this package makes, that it adds nothing to what GDAL reads. The
 other two columns are reported, not required. A warped VRT computes
 each block on its own, so where the approximate transformer struggles
 (near a pole, say) it can differ from a single direct warp; and GDAL's
-resampling kernels change between releases.
+resampling kernels can change between releases.
 
 ```{python}
-from osgeo import osr
-
-man = fixture_json("warp/manifest.json")
-
-
-def warp_now(c, method):
-    s = gdal.Open(fixture(c["source"]))
-    nd = s.GetRasterBand(1).GetNoDataValue()
-    srs = osr.SpatialReference(); srs.SetFromUserInput(c["crs"])
-    dst = gdal.GetDriverByName("MEM").Create("", c["width"], c["height"], s.RasterCount,
-                                             s.GetRasterBand(1).DataType)
-    dst.SetGeoTransform(c["geotransform"]); dst.SetProjection(srs.ExportToWkt())
-    for b in range(1, s.RasterCount + 1):
-        band = dst.GetRasterBand(b)
-        if nd is not None:
-            band.SetNoDataValue(nd)
-        band.Fill(nd if nd is not None else 0)
-        gdal.Warp(dst, s, options=gdal.WarpOptions(
-            srcBands=[b], dstBands=[b], resampleAlg=method, srcNodata=nd, dstNodata=nd,
-            errorThreshold=0.125, warpMemoryLimit=c["warp_memory_mb"], multithread=False,
-            overviewLevel="AUTO" if c["overview"] != "none" else "NONE",
-            warpOptions=["INIT_DEST=NO_DATA"] if nd is not None else []))
-    return dst.ReadAsArray().reshape(s.RasterCount, c["height"], c["width"])
-
-
 def same(a, b):
     return float(np.mean((a == b) | (np.isnan(a) & np.isnan(b)))) if a.dtype.kind == "f" \
         else float(np.mean(a == b))
@@ -138,25 +143,23 @@ def same(a, b):
 
 rows = []
 for c in man["cases"]:
-    if c["warp_memory_mb"] < 64 or c.get("wrap_globe"):
-        continue   # chunked-warp and wrap cases: see the wxylib explainers
     gt, W, H = c["geotransform"], c["width"], c["height"]
     bbox = (gt[0], gt[3] + gt[5] * H, gt[0] + gt[1] * W, gt[3])
-    for r in c["results"]:
-        kw = dict(crs=c["crs"], bbox=bbox, shape=(W, H), resampling=r["resampling"],
-                  errorThreshold=0.125)
+    pinned_all = np.load(data("warp/" + c["file"]))
+    for m in c["resampling"]:
+        kw = dict(crs=c["crs"], bbox=bbox, shape=(W, H), resampling=m,
+                  errorThreshold=c["error_threshold"])
         if c["overview"] == "none":
             kw["overviewLevel"] = "NONE"
-        vrt = gdalxarray.warp(fixture(c["source"]), **kw)
+        vrt = gdalxarray.warp(data(c["source"]), **kw)
         gx = xr.open_dataset(vrt, engine="gdalxarray", multidim=False,
-                             mask_and_scale=False)["band_data"].values
-        vrt_gdal = gdal.Open(vrt).ReadAsArray().reshape(gx.shape)
-        direct = warp_now(c, r["resampling"])
-        pinned = fixture_array("warp/" + r["file"], c["dtype"]).reshape(gx.shape)
-        rows.append({"case": c["name"], "resampling": r["resampling"],
+                             mask_and_scale=False)["band_data"].values[0]
+        vrt_gdal = gdal.Open(vrt).ReadAsArray()
+        direct = warp_direct(data(c["source"]), c["crs"], gt, W, H, m, c["overview"])
+        rows.append({"case": c["name"], "resampling": m,
                      "gdalxarray = GDAL VRT": same(gx, vrt_gdal),
                      "GDAL VRT = GDAL direct": same(vrt_gdal, direct),
-                     "GDAL direct = pinned": same(direct, pinned)})
+                     "GDAL direct = pinned": same(direct, pinned_all[m])})
 
 tab = pd.DataFrame(rows)
 tab.style.format("{:.2%}", subset=tab.columns[2:]).hide(axis="index")

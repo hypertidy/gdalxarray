@@ -1,0 +1,37 @@
+{
+  "dataset": "NOAA-NSIDC Climate Data Record of Passive Microwave Sea Ice Concentration Version 6",
+  "day": "2025-09-20",
+  "url": "https://noaadata.apps.nsidc.org/NOAA/G02202_V6/south/daily/2025/sic_pss25_20250920_am2_v06r00.nc",
+  "found_in": "https://github.com/mdsumner/aad-filelist/releases/download/latest/cdr_sic_G02202_V6.parquet",
+  "download_sha256": "d0579a2da550697cb732c6dee25db2b1680b97e702661abe4a69bf0bce10a056",
+  "source_metadata": {
+    "title": "NOAA-NSIDC Climate Data Record of Passive Microwave Sea Ice Concentration Version 6",
+    "institution": "NSIDC > National Snow and Ice Data Center",
+    "license": "No constraints on data access or use",
+    "id": "https://doi.org/10.7265/b18j-z797",
+    "naming_authority": "org.doi.dx",
+    "references": "Comiso, J. C., and F. Nishio. 2008. Trends in the Sea Ice Cover Using Enhanced and Compatible AMSR-E, SSM/I, and SMMR Data. Journal of Geophysical Research 113, C02S07, doi:10.1029/2007JC0043257. ; Comiso, J. C., D. Cavalieri, C. Parkinson, and P. Gloersen. 1997. Passive Microwave Algorithms for Sea Ice Concentrations: A Comparison of Two Techniques. Remote Sensing of the Environment 60(3):357-84. ; Comiso, J. C. 1984. Characteristics of Winter Sea Ice from Satellite Multispectral Microwave Observations. Journal of Geophysical Research 91(C1):975-94. ; Cavalieri, D. J., P. Gloersen, and W. J. Campbell. 1984. Determination of Sea Ice Parameters with the NIMBUS-7 SMMR. Journal of Geophysical Research 89(D4):5355-5369. ; Cavalieri, D. J., C. l. Parkinson, P. Gloersen, J. C. Comiso, and H. J. Zwally. 1999. Deriving Long-term Time Series of Sea Ice Cover from Satellite Passive-Microwave Multisensor Data Sets. Journal of Geophysical Research 104(7): 15,803-15,814 ; Comiso, J.C., R.A. Gersten, L.V. Stock, J. Turner, G.J. Perez, and K. Cho. 2017. Positive Trend in the Antarctic Sea Ice Cover and Associated Changes in Surface Temperature. J. Climate, 30, 2251\u20132267, doi:10.1175/JCLI-D-16-0408.1",
+    "creator_name": "NSIDC/NOAA",
+    "summary": "This data set provides a passive microwave sea ice concentration climate data record (CDR) based on gridded brightness temperatures (TBs) from the Nimbus-7 Scanning Multichannel Microwave Radiometer (SMMR) and the Defense Meteorological Satellite Program (DMSP) series of passive microwave radiometers: the Special Sensor Microwave Imager (SSM/I) and the Special Sensor Microwave Imager/Sounder (SSMIS). The sea ice concentration CDR is an estimate of sea ice concentration that is produced by combining concentration estimates from two algorithms developed at the NASA Goddard Space Flight Center (GSFC): the NASA Team (NT) algorithm and the Bootstrap (BT) algorithm. The individual algorithms are used to process and combine brightness temperature data at NSIDC. This product is designed to provide a consistent time series of sea ice concentrations (the fraction, or percentage, of ocean area covered by sea ice) from November 1978 to the present, which spans the coverage of several passive microwave instruments. The data are gridded on the NSIDC polar stereographic grid with 25 km x 25 km grid cells and are available in NetCDF file format. Each file contains a variable with the CDR concentration values as well as variables that hold the raw NT and BT processed concentrations for reference. Variables containing standard deviation, quality flags, and projection information are also included. Files that are from 2013 to the present also contain a prototype CDR sea ice concentration based on gridded TBs from the Advanced Microwave Scanning Radiometer 2 (AMSR2) onboard the GCOM-W1 satellite.",
+    "platform": "GCOM-W1 > Global Change Observation Mission 1st-Water",
+    "sensor": "AMSR2 > Advanced Microwave Scanning Radiometer 2",
+    "product_version": "v06r00"
+  },
+  "processing": "cdr_seaice_conc for one day, unpacked (scale 0.01, offset 0); flag and fill values set to NaN; written as a float32 COG on the source grid (EPSG:3412, 25000 m)",
+  "files": {
+    "seaice-sh-2025-09-20.tif": "24e4fa0877760af80806989684915b8b724f7650c27bdfc12a04f44bada1ea3b"
+  },
+  "geotransform": [
+    -3950000.0,
+    25000.0,
+    0.0,
+    4350000.0,
+    0.0,
+    -25000.0
+  ],
+  "flagged_cells": 21893,
+  "made_with": {
+    "script": "scripts/fixtures/make_warp.py",
+    "gdal": "3.13.3"
+  }
+}
