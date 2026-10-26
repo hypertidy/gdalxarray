@@ -9,9 +9,10 @@ site fails to build.
 
 The inputs are moving from synthetic test stores to small cuts of real
 public data, each rebuilt by a script from its source with a provenance
-record ([#41](https://github.com/hypertidy/gdalxarray/issues/41)). The
-virtual-paths and byte-reference pages already use three days of NOAA
-OISST v2.1.
+record ([#41](https://github.com/hypertidy/gdalxarray/issues/41)). Real
+so far: a Sentinel-2 scene over Hobart (open modes), three days of NOAA
+OISST v2.1 (virtual paths, byte-reference stores), and Antarctic sea ice
+with GEBCO bathymetry (warping).
 
 [Open modes](modes.qmd)
 : Classic rasters with bands as a dimension or as variables, and

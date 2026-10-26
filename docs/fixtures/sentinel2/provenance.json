@@ -1,0 +1,86 @@
+{
+  "dataset": "Copernicus Sentinel-2 Level-2A surface reflectance",
+  "day": "2024-12-04",
+  "license": "Copernicus Sentinel data terms (free and open); attribution: contains modified Copernicus Sentinel data",
+  "item": {
+    "id": "S2A_T55GEN_20241204T000222_L2A",
+    "collection": "sentinel-2-c1-l2a",
+    "stac": "https://earth-search.aws.element84.com/v1/collections/sentinel-2-c1-l2a/items/S2A_T55GEN_20241204T000222_L2A",
+    "datetime": "2024-12-04T00:08:46.208000Z",
+    "eo:cloud_cover": 0.00652,
+    "platform": "sentinel-2a",
+    "tile": "55GEN"
+  },
+  "assets": {
+    "blue": {
+      "href": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/55/G/EN/2024/12/S2A_T55GEN_20241204T000222_L2A/B02.tif",
+      "scale": 0.0001,
+      "offset": -0.1,
+      "nodata": 0,
+      "eo:bands": [
+        {
+          "name": "B02",
+          "common_name": "blue",
+          "center_wavelength": 0.49,
+          "full_width_half_max": 0.098
+        }
+      ]
+    },
+    "green": {
+      "href": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/55/G/EN/2024/12/S2A_T55GEN_20241204T000222_L2A/B03.tif",
+      "scale": 0.0001,
+      "offset": -0.1,
+      "nodata": 0,
+      "eo:bands": [
+        {
+          "name": "B03",
+          "common_name": "green",
+          "center_wavelength": 0.56,
+          "full_width_half_max": 0.045
+        }
+      ]
+    },
+    "red": {
+      "href": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/55/G/EN/2024/12/S2A_T55GEN_20241204T000222_L2A/B04.tif",
+      "scale": 0.0001,
+      "offset": -0.1,
+      "nodata": 0,
+      "eo:bands": [
+        {
+          "name": "B04",
+          "common_name": "red",
+          "center_wavelength": 0.665,
+          "full_width_half_max": 0.038
+        }
+      ]
+    },
+    "nir": {
+      "href": "https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/sentinel-2-c1-l2a/55/G/EN/2024/12/S2A_T55GEN_20241204T000222_L2A/B08.tif",
+      "scale": 0.0001,
+      "offset": -0.1,
+      "nodata": 0,
+      "eo:bands": [
+        {
+          "name": "B08",
+          "common_name": "nir",
+          "center_wavelength": 0.842,
+          "full_width_half_max": 0.145
+        }
+      ]
+    }
+  },
+  "bounds": [
+    515000.0,
+    5243000.0,
+    530000.0,
+    5255500.0
+  ],
+  "crs": "EPSG:32755",
+  "processing": "blue, green, red and nir (10 m) cropped to (515000.0, 5243000.0, 530000.0, 5255500.0) and averaged to 20 m; stored digital numbers kept, with each asset's scale and offset written to its band",
+  "file": "sentinel2-hobart-2024-12-04.tif",
+  "sha256": "43df53b5f8e262445dd69ef7281cc4ae9ec7d6a6e5fb5be49f976ce71df8d277",
+  "made_with": {
+    "script": "scripts/fixtures/make_sentinel2.py",
+    "gdal": "3.13.3"
+  }
+}

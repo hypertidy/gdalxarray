@@ -23,10 +23,19 @@ import matplotlib.pyplot as plt
 ## Classic, bands as a dimension
 
 The default for `multidim=False`: one `band_data` variable with
-dimensions `(band, y, x)`, the layout rioxarray uses.
+dimensions `(band, y, x)`, the layout rioxarray uses. The example is a
+cloud-free Sentinel-2 summer scene over Hobart, from kunanyi / Mount
+Wellington to the Derwent estuary: four bands (blue, green, red, near
+infrared) on the scene's own UTM zone 55S grid, averaged to 20 m.
 
 ```{python}
-src = fixture("cog/utm-u16-lzw-pred2-3band.tif")
+#| echo: false
+#| output: asis
+provenance("sentinel2")
+```
+
+```{python}
+src = data("sentinel2/" + data_json("sentinel2/provenance.json")["file"])
 ds = xr.open_dataset(src, engine="gdalxarray", multidim=False)
 ds
 ```
@@ -38,20 +47,27 @@ the `crs` coordinate's index:
 ds.xindexes["crs"]
 ```
 
-Ordinary xarray operations apply. A per-pixel mean over the bands, and
-each band on its own:
+The bands are stored as integers with a scale and offset (Sentinel-2
+L2A digital numbers); with the default `mask_and_scale=True` they arrive
+as surface reflectance, with nodata masked:
 
 ```{python}
-#| fig-cap: "Three bands of a UTM zone 55S fixture (synthetic values), and their mean."
-bd = ds["band_data"]
-fig, axs = plt.subplots(1, 4, figsize=(12, 2.8), sharey=True, layout="constrained")
-for i, ax in enumerate(axs[:3]):
-    bd.isel(band=i).plot(ax=ax, add_colorbar=False, cmap="viridis")
-    ax.set_title(f"band {i + 1}")
-bd.mean("band").plot(ax=axs[3], add_colorbar=False, cmap="magma")
-axs[3].set_title("mean over band")
-for ax in axs:
-    ax.set_xlabel("x (m)"); ax.set_ylabel("")
+ds["band_data"].encoding.get("scale_factor"), ds["band_data"].encoding.get("add_offset"), \
+    float(ds["band_data"].mean())
+```
+
+Ordinary xarray operations apply. A true-colour composite is a
+selection and reordering along `band`:
+
+```{python}
+#| fig-cap: "Sentinel-2 true colour (red, green, blue reflectance, stretched) over Hobart, kunanyi / Mount Wellington and the Derwent estuary."
+rgb = ds["band_data"].sel(band=[3, 2, 1])               # red, green, blue
+rgb = (rgb / rgb.quantile(0.98)).clip(0, 1).transpose("y", "x", "band")
+fig, ax = plt.subplots(figsize=(8, 6.7))
+rgb.plot.imshow(ax=ax, rgb="band")
+ax.set_aspect("equal")
+ax.set_title("true colour, " + data_json("sentinel2/provenance.json")["day"])
+ax.set_xlabel("easting (m)"); ax.set_ylabel("northing (m)")
 plt.show()
 ```
 
@@ -59,11 +75,22 @@ plt.show()
 
 `band_as_dim=False` makes each band its own variable, named from the
 band description (or `band_N` when there is none). This suits rasters
-whose bands are different quantities.
+whose bands are different quantities, and makes band arithmetic read
+like the quantities it combines:
 
 ```{python}
 dsv = xr.open_dataset(src, engine="gdalxarray", multidim=False, band_as_dim=False)
-list(dsv.data_vars), dsv["band_2"].dims
+list(dsv.data_vars), dsv["nir"].dims
+```
+
+```{python}
+#| fig-cap: "Normalised difference vegetation index, (nir - red) / (nir + red), computed from the named band variables."
+ndvi = (dsv["nir"] - dsv["red"]) / (dsv["nir"] + dsv["red"])
+fig, ax = plt.subplots(figsize=(8, 6.7))
+ndvi.plot(ax=ax, cmap="RdYlGn", vmin=-0.5, vmax=0.9, cbar_kwargs={"label": "NDVI"})
+ax.set_aspect("equal"); ax.set_title("NDVI")
+ax.set_xlabel("easting (m)"); ax.set_ylabel("northing (m)")
+plt.show()
 ```
 
 ## Multidimensional
