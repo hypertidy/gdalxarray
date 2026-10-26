@@ -3,3 +3,4 @@
 _freeze/
 
 **/*.quarto_ipynb
+fixtures/**/*.aux.xml
