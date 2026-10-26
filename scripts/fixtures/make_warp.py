@@ -60,8 +60,18 @@ def sha256(path):
     return h.hexdigest()
 
 
+# Some servers (ERDDAP among them) refuse Python's default User-Agent.
+UA = "gdalxarray-fixtures (+https://github.com/hypertidy/gdalxarray)"
+
+
+def urlopen(url, timeout=300):
+    return urllib.request.urlopen(
+        urllib.request.Request(url, headers={"User-Agent": UA}), timeout=timeout
+    )
+
+
 def download(url, dst):
-    with urllib.request.urlopen(url, timeout=300) as r, open(dst, "wb") as f:
+    with urlopen(url) as r, open(dst, "wb") as f:
         shutil.copyfileobj(r, f)
     return dst
 
@@ -163,7 +173,7 @@ def make_gebco(tmp):
     out.mkdir(parents=True)
     tif_url = f"{GEBCO_BASE}/GEBCO_{GEBCO_YEAR}.tif"
     stac_url = f"{GEBCO_BASE}/GEBCO_{GEBCO_YEAR}.stac-item.json"
-    stac = json.loads(urllib.request.urlopen(stac_url, timeout=120).read())
+    stac = json.loads(urlopen(stac_url, timeout=120).read())
 
     src = gdal.Open("/vsicurl/" + tif_url)
     w, h = GEBCO_SHAPE
