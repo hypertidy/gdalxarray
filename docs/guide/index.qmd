@@ -2,12 +2,16 @@
 title: "Guide"
 ---
 
-Each page here runs against small inputs from
-[wxylib/fixtures](https://github.com/wxylib/fixtures), a set of test
-stores kept with what GDAL itself reads from them. The fixtures are
-pinned to one commit, so the pages give the same result on every
-build, and where a fixture carries a GDAL oracle the page checks
-gdalxarray against it: if a read drifts, the site fails to build.
+Each page here runs against small inputs kept with the site, so it
+builds the same way every time, and where an input carries a GDAL
+oracle the page checks gdalxarray against it: if a read drifts, the
+site fails to build.
+
+The inputs are moving from synthetic test stores to small cuts of real
+public data, each rebuilt by a script from its source with a provenance
+record ([#41](https://github.com/hypertidy/gdalxarray/issues/41)). The
+virtual-paths and byte-reference pages already use three days of NOAA
+OISST v2.1.
 
 [Open modes](modes.qmd)
 : Classic rasters with bands as a dimension or as variables, and

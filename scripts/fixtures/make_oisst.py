@@ -170,7 +170,9 @@ def zarr_copy(files):
         for v in ARRAYS
     }
     out = OUT / "oisst.zarr"
-    ds.to_zarr(out, mode="w", zarr_format=3, encoding=enc, consolidated=False)
+    # Consolidated: a web server cannot list a directory, so a remote reader
+    # (GDAL over /vsicurl/) finds the arrays only through consolidated metadata.
+    ds.to_zarr(out, mode="w", zarr_format=3, encoding=enc, consolidated=True)
     return {"file": out.name, "arrays": ARRAYS, "chunks": [1, 1, 360, 720]}
 
 
