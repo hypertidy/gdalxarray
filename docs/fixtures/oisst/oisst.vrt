@@ -1,0 +1,228 @@
+<VRTDataset>
+  <Group name="/">
+    <Dimension name="lat" type="HORIZONTAL_Y" direction="NORTH" size="720" indexingVariable="lat" />
+    <Dimension name="lon" type="HORIZONTAL_X" direction="EAST" size="1440" indexingVariable="lon" />
+    <Dimension name="time" type="TEMPORAL" size="3" indexingVariable="time" />
+    <Dimension name="zlev" type="VERTICAL" direction="DOWN" size="1" indexingVariable="zlev" />
+    <Array name="time">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="time" />
+      <InlineValues offset="0" count="3">17167 17168 17169</InlineValues>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Center time of the day</Value>
+      </Attribute>
+    </Array>
+    <Array name="zlev">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="zlev" />
+      <InlineValues offset="0" count="1">0</InlineValues>
+      <Attribute name="actual_range">
+        <DataType>String</DataType>
+        <Value>0, 0</Value>
+      </Attribute>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Sea surface height</Value>
+      </Attribute>
+      <Attribute name="positive">
+        <DataType>String</DataType>
+        <Value>down</Value>
+      </Attribute>
+    </Array>
+    <Array name="lat">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="lat" />
+      <RegularlySpacedValues start="-89.875" increment="0.25" />
+      <Attribute name="grids">
+        <DataType>String</DataType>
+        <Value>Uniform grid from -89.875 to 89.875 by 0.25</Value>
+      </Attribute>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Latitude</Value>
+      </Attribute>
+    </Array>
+    <Array name="lon">
+      <DataType>Float64</DataType>
+      <DimensionRef ref="lon" />
+      <RegularlySpacedValues start="0.125" increment="0.25" />
+      <Attribute name="grids">
+        <DataType>String</DataType>
+        <Value>Uniform grid from 0.125 to 359.875 by 0.25</Value>
+      </Attribute>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Longitude</Value>
+      </Attribute>
+    </Array>
+    <Array name="sst">
+      <DataType>Int16</DataType>
+      <DimensionRef ref="time" />
+      <DimensionRef ref="zlev" />
+      <DimensionRef ref="lat" />
+      <DimensionRef ref="lon" />
+      <BlockSize>1,1,720,1440</BlockSize>
+      <Unit>Celsius</Unit>
+      <NoDataValue>-999</NoDataValue>
+      <Offset>0</Offset>
+      <Scale>0.0099999997764825821</Scale>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250101.nc</SourceFilename>
+        <SourceArray>/sst</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="0,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250102.nc</SourceFilename>
+        <SourceArray>/sst</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="1,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250103.nc</SourceFilename>
+        <SourceArray>/sst</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="2,0,0,0" />
+      </Source>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Daily sea surface temperature</Value>
+      </Attribute>
+      <Attribute name="valid_max">
+        <DataType>Int16</DataType>
+        <Value>4500</Value>
+      </Attribute>
+      <Attribute name="valid_min">
+        <DataType>Int16</DataType>
+        <Value>-300</Value>
+      </Attribute>
+    </Array>
+    <Array name="anom">
+      <DataType>Int16</DataType>
+      <DimensionRef ref="time" />
+      <DimensionRef ref="zlev" />
+      <DimensionRef ref="lat" />
+      <DimensionRef ref="lon" />
+      <BlockSize>1,1,720,1440</BlockSize>
+      <Unit>Celsius</Unit>
+      <NoDataValue>-999</NoDataValue>
+      <Offset>0</Offset>
+      <Scale>0.0099999997764825821</Scale>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250101.nc</SourceFilename>
+        <SourceArray>/anom</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="0,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250102.nc</SourceFilename>
+        <SourceArray>/anom</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="1,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250103.nc</SourceFilename>
+        <SourceArray>/anom</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="2,0,0,0" />
+      </Source>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Daily sea surface temperature anomalies</Value>
+      </Attribute>
+      <Attribute name="valid_max">
+        <DataType>Int16</DataType>
+        <Value>1200</Value>
+      </Attribute>
+      <Attribute name="valid_min">
+        <DataType>Int16</DataType>
+        <Value>-1200</Value>
+      </Attribute>
+    </Array>
+    <Array name="err">
+      <DataType>Int16</DataType>
+      <DimensionRef ref="time" />
+      <DimensionRef ref="zlev" />
+      <DimensionRef ref="lat" />
+      <DimensionRef ref="lon" />
+      <BlockSize>1,1,720,1440</BlockSize>
+      <Unit>Celsius</Unit>
+      <NoDataValue>-999</NoDataValue>
+      <Offset>0</Offset>
+      <Scale>0.0099999997764825821</Scale>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250101.nc</SourceFilename>
+        <SourceArray>/err</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="0,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250102.nc</SourceFilename>
+        <SourceArray>/err</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="1,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250103.nc</SourceFilename>
+        <SourceArray>/err</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="2,0,0,0" />
+      </Source>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Estimated error standard deviation of analysed_sst</Value>
+      </Attribute>
+      <Attribute name="valid_max">
+        <DataType>Int16</DataType>
+        <Value>1000</Value>
+      </Attribute>
+      <Attribute name="valid_min">
+        <DataType>Int16</DataType>
+        <Value>0</Value>
+      </Attribute>
+    </Array>
+    <Array name="ice">
+      <DataType>Int16</DataType>
+      <DimensionRef ref="time" />
+      <DimensionRef ref="zlev" />
+      <DimensionRef ref="lat" />
+      <DimensionRef ref="lon" />
+      <BlockSize>1,1,720,1440</BlockSize>
+      <Unit>%</Unit>
+      <NoDataValue>-999</NoDataValue>
+      <Offset>0</Offset>
+      <Scale>0.0099999997764825821</Scale>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250101.nc</SourceFilename>
+        <SourceArray>/ice</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="0,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250102.nc</SourceFilename>
+        <SourceArray>/ice</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="1,0,0,0" />
+      </Source>
+      <Source>
+        <SourceFilename relativetoVRT="1">nc/oisst-avhrr-v02r01.20250103.nc</SourceFilename>
+        <SourceArray>/ice</SourceArray>
+        <SourceSlab offset="0,0,0,0" count="1,1,720,1440" step="1,1,1,1" />
+        <DestSlab offset="2,0,0,0" />
+      </Source>
+      <Attribute name="long_name">
+        <DataType>String</DataType>
+        <Value>Sea ice concentration</Value>
+      </Attribute>
+      <Attribute name="valid_max">
+        <DataType>Int16</DataType>
+        <Value>100</Value>
+      </Attribute>
+      <Attribute name="valid_min">
+        <DataType>Int16</DataType>
+        <Value>0</Value>
+      </Attribute>
+    </Array>
+  </Group>
+</VRTDataset>

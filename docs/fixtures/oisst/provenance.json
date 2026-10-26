@@ -1,0 +1,87 @@
+{
+  "dataset": "NOAA 0.25-degree Daily Optimum Interpolation Sea Surface Temperature (OISST), Version 2.1",
+  "doi": "10.25921/RE9P-PT57",
+  "reference": "Huang, B. et al. (2021) J. Climate 34, 2923-2939, doi:10.1175/JCLI-D-20-0166.1",
+  "license": "CC0-1.0",
+  "retrieved": "2026-10-26",
+  "sources": [
+    {
+      "day": "20250101",
+      "url": "https://noaa-cdr-sea-surface-temp-optimum-interpolation-pds.s3.amazonaws.com/data/v2.1/avhrr/202501/oisst-avhrr-v02r01.20250101.nc",
+      "file": "nc/oisst-avhrr-v02r01.20250101.nc",
+      "bytes": 1553086,
+      "sha256": "aec833d9936474a54c55d4550be78ffacfdebc4de7552f7ff30ccf1d73bbde2e"
+    },
+    {
+      "day": "20250102",
+      "url": "https://noaa-cdr-sea-surface-temp-optimum-interpolation-pds.s3.amazonaws.com/data/v2.1/avhrr/202501/oisst-avhrr-v02r01.20250102.nc",
+      "file": "nc/oisst-avhrr-v02r01.20250102.nc",
+      "bytes": 1553429,
+      "sha256": "14afea0dbea083c7614a9e91379a21780fbf04b4a1b6b5d84ba2d6d12ab3620c"
+    },
+    {
+      "day": "20250103",
+      "url": "https://noaa-cdr-sea-surface-temp-optimum-interpolation-pds.s3.amazonaws.com/data/v2.1/avhrr/202501/oisst-avhrr-v02r01.20250103.nc",
+      "file": "nc/oisst-avhrr-v02r01.20250103.nc",
+      "bytes": 1555373,
+      "sha256": "e48580e654eedcfad5eb568da02e169784f574f096206312478ba9a7c875a6b7"
+    }
+  ],
+  "products": {
+    "vrt": "oisst.vrt",
+    "byte_tables": [
+      {
+        "file": "refs_sst.parquet",
+        "rows": 3,
+        "chunks": [
+          1,
+          1,
+          720,
+          1440
+        ],
+        "dims": [
+          "time",
+          "zlev",
+          "lat",
+          "lon"
+        ]
+      },
+      {
+        "file": "refs_ice.parquet",
+        "rows": 3,
+        "chunks": [
+          1,
+          1,
+          720,
+          1440
+        ],
+        "dims": [
+          "time",
+          "zlev",
+          "lat",
+          "lon"
+        ]
+      }
+    ],
+    "zarr": {
+      "file": "oisst.zarr",
+      "arrays": [
+        "sst",
+        "ice"
+      ],
+      "chunks": [
+        1,
+        1,
+        360,
+        720
+      ]
+    }
+  },
+  "made_with": {
+    "script": "scripts/fixtures/make_oisst.py",
+    "gdal": "3.13.3",
+    "xarray": "2026.4.1.dev32+g71cfb13ac",
+    "zarr": "3.4.1",
+    "gdalxarray": "0.5.1"
+  }
+}

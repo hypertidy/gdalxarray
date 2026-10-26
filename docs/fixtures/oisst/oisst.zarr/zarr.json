@@ -1,0 +1,9 @@
+{
+  "attributes": {
+    "title": "NOAA OISST v2.1, three days, as xarray writes them to Zarr v3",
+    "source": "doi:10.25921/RE9P-PT57",
+    "license": "CC0-1.0"
+  },
+  "zarr_format": 3,
+  "node_type": "group"
+}
