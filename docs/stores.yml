@@ -133,14 +133,15 @@ stores:
     note: Data variables use the pcodec codec, which GDAL does not read yet.
 
   # ---- COGs and VRTs --------------------------------------------------------
-  - key: gebco-pawsey
-    title: GEBCO 2024 global bathymetry COG (Pawsey idea-gebco-tif)
-    dsn: /vsicurl/https://projects.pawsey.org.au/idea-gebco-tif/GEBCO_2024.tif
+  - key: gebco-sourcecoop
+    title: GEBCO 2026 global bathymetry COG (source.coop ausantarctic)
+    dsn: /vsicurl/https://data.source.coop/ausantarctic/gebco/GEBCO_2026.tif
     multidim: false
-    provider: AAD on Pawsey Acacia
-    permanence: unknown
+    provider: AAD on source.coop
+    permanence: permanent
     confirm: true
     used_in: [gallery/cog.qmd]
+    note: Also the source of the warping guide's GEBCO fixture (scripts/fixtures/make_warp.py).
 
   - key: mur-sourcecoop
     title: GHRSST MUR v4.1 daily SST COG (source.coop ausantarctic)

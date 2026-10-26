@@ -19,26 +19,26 @@ GDAL picks for the request.
 ```{python}
 #| echo: false
 #| output: asis
-status_callout("gebco-pawsey")
+status_callout("gebco-sourcecoop")
 ```
 
 ```{python}
 #| error: true
-dsn = "/vsicurl/https://projects.pawsey.org.au/idea-gebco-tif/GEBCO_2024.tif"
-if live("gebco-pawsey"):
+dsn = "/vsicurl/https://data.source.coop/ausantarctic/gebco/GEBCO_2026.tif"
+if live("gebco-sourcecoop"):
     gebco = xr.open_dataset(dsn, engine="gdalxarray", multidim=False)
     print(gebco["band_data"].shape, gebco["band_data"].encoding.get("preferred_chunks"))
 ```
 
 ```{python}
 #| echo: false
-assert dsn == store("gebco-pawsey")["dsn"]
+assert dsn == store("gebco-sourcecoop")["dsn"]
 ```
 
 ```{python}
 #| error: true
-#| fig-cap: "GEBCO 2024 elevation, 140-152E, 38-46S: the shelf, the Tasman Fracture Zone and the East Tasman Plateau."
-if live("gebco-pawsey"):
+#| fig-cap: "GEBCO 2026 elevation, 140-152E, 38-46S: the shelf, the Tasman Fracture Zone and the East Tasman Plateau."
+if live("gebco-sourcecoop"):
     tas = gebco["band_data"].isel(band=0).sel(x=slice(140, 152), y=slice(-38, -46))
     fig, ax = plt.subplots(figsize=(8, 6))
     tas.plot(ax=ax, cmap="terrain", vmin=-6000, vmax=1500)
