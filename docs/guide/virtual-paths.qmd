@@ -127,10 +127,12 @@ path has only GDAL's band value to go on:
 #| output: asis
 zf, cf = meta["fill_value"], meta["attributes"].get("_FillValue")
 if cf is not None and zf != cf:
+    sf = meta["attributes"].get("scale_factor", 1)
     print(f"So with mask-and-scale decoding on, the classic face masks {zf} "
-          f"rather than {cf}: on this data, land and ice cells come through as "
-          f"values and any real {zf} is lost. Pass `mask_and_scale=False` and "
-          "decode yourself, or prefer the multidim read, for stores written this way.")
+          f"rather than {cf}: on this data, land cells (stored as {cf}) come through "
+          f"as {cf * sf:g} degrees, and real water at exactly {zf * sf:g} degrees is "
+          "masked. Pass `mask_and_scale=False` and decode yourself, or prefer the "
+          "multidim read, for stores written this way.")
 else:
     print("With this xarray and zarr the two agree, so both paths mask the same cells.")
 ```
