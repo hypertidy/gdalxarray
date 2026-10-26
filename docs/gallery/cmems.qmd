@@ -74,7 +74,13 @@ dsn = ('ZARR:"/vsicurl/https://s3.waw3-1.cloudferro.com/mdl-arco-time-025/arco/'
 if live("cmems-glorys"):
     gl = xr.open_dataset(dsn, engine="gdalxarray")
     print(dict(gl["thetao"].sizes))
+    print("elevation (m):", gl["elevation"].values[[0, -1]])
 ```
+
+The ARCO stores name the vertical axis `elevation`, not `depth` as the
+original netCDF does; the values printed above show its sign and order.
+The cells below select by distance from the surface, so they work
+whichever way the axis runs.
 
 ```{python}
 #| echo: false
@@ -88,10 +94,14 @@ day:
 #| error: true
 #| fig-cap: "GLORYS12 potential temperature on a section along 34S, upper 1000 m, 15 January 2010."
 if live("cmems-glorys"):
+    z = gl["elevation"]
+    upper = z[np.abs(z) <= 1000]                      # the upper 1000 m, either order
     sec = (gl["thetao"].sel(time="2010-01-15").sel(latitude=-34, method="nearest")
-           .sel(longitude=slice(150, 165), depth=slice(0, 1000)))
+           .sel(longitude=slice(150, 165), elevation=upper))
     fig, ax = plt.subplots(figsize=(9, 3.8))
-    sec.plot(ax=ax, cmap="RdYlBu_r", yincrease=False)
+    sec.plot(ax=ax, x="longitude", y="elevation", cmap="RdYlBu_r",
+             cbar_kwargs={"label": "potential temperature (degrees C)"})
+    ax.set_ylabel("elevation (m)")
     plt.show()
 ```
 
@@ -112,7 +122,8 @@ if live("cmems-ostia") and live("cmems-glorys"):
     os_ = xr.open_dataset(dsn, engine="gdalxarray")
     box = dict(latitude=slice(-40, -25), longitude=slice(147, 162))
     a = (os_["analysed_sst"].sel(time="2010-01-15").sel(**box) - 273.15).squeeze()
-    b = gl["thetao"].sel(time="2010-01-15").isel(depth=0).sel(**box).squeeze()
+    top = int(np.argmin(np.abs(gl["elevation"].values)))   # level nearest the surface
+    b = gl["thetao"].sel(time="2010-01-15").isel(elevation=top).sel(**box).squeeze()
     fig, axs = plt.subplots(1, 2, figsize=(11, 4.5), sharey=True, layout="constrained")
     a.plot(ax=axs[0], cmap="RdYlBu_r", vmin=14, vmax=27, add_colorbar=False)
     b.plot(ax=axs[1], cmap="RdYlBu_r", vmin=14, vmax=27)
