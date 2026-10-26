@@ -26,10 +26,11 @@ whatever the size of the source.
 
 ## Antarctic sea ice to longitude and latitude
 
-One day of Antarctic sea-ice concentration from passive microwave, on
-the grid it is published on: 25 km polar stereographic cells on the
-Hughes 1980 ellipsoid (EPSG:3412, not the WGS84-based EPSG:3031).
-Land, coast and the pole hole are nodata.
+One day of Antarctic sea-ice concentration from satellite passive
+microwave (the NOAA/NSIDC climate data record), on the grid it is
+published on: 25 km polar stereographic cells on the Hughes 1980
+ellipsoid (EPSG:3412, not the WGS84-based EPSG:3031). Land, coast and
+the pole hole are nodata.
 
 ```{python}
 #| echo: false
