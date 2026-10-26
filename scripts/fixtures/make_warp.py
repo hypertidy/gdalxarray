@@ -32,6 +32,9 @@ import hashlib
 import json
 import shutil
 import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -84,9 +87,6 @@ UA = "gdalxarray-fixtures (+https://github.com/hypertidy/gdalxarray)"
 
 def urlopen(url, timeout=300, attempts=5):
     """urlopen with a User-Agent, retrying refusals and server errors with back-off."""
-    import time
-    import urllib.error
-
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     for i in range(attempts):
         try:
