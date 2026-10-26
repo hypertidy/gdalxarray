@@ -6,9 +6,19 @@
     "datetime": "2026-01-01T00:00:00Z"
   },
   "links": [],
-  "processing": "averaged to 720 x 360 (0.5 degree) through the COG overviews, int16 metres",
+  "processing": "averaged to 720 x 360 (0.5 degree) through the COG overviews, int16 metres; geotransform snapped to the exact half-degree grid",
+  "publisher_terms": {
+    "license": "public domain; acknowledge the source (GEBCO Grid terms of use)",
+    "doi": "10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa",
+    "citation": "GEBCO Bathymetric Compilation Group 2026 (2026). The GEBCO_2026 Grid - a continuous terrain model for oceans and land at 15 arc-second intervals. NERC EDS British Oceanographic Data Centre NOC.",
+    "not_for": "navigation or any other purpose involving safety at sea",
+    "terms_url": "https://www.gebco.net/data-products/gridded-bathymetry/terms-of-use",
+    "grid_url": "https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid"
+  },
+  "license": "public domain; acknowledge the source (GEBCO Grid terms of use)",
+  "doi": "10.5285/4f68d5c7-45eb-f999-e063-7086abc036fa",
   "files": {
-    "gebco-2026-0.5deg.tif": "6cbff427c99894f7575af164ae9927689c0fb2478ddf352342508286a92a7ac9"
+    "gebco-2026-0.5deg.tif": "ff92b8d7d23fc75bc57adb99c159f762fc1352c08c770824d31399e3e4c61227"
   },
   "source_size": [
     86400,
