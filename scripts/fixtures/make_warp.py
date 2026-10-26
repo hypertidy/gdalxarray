@@ -78,10 +78,21 @@ def sha256(path):
 UA = "gdalxarray-fixtures (+https://github.com/hypertidy/gdalxarray)"
 
 
-def urlopen(url, timeout=300):
-    return urllib.request.urlopen(
-        urllib.request.Request(url, headers={"User-Agent": UA}), timeout=timeout
-    )
+def urlopen(url, timeout=300, attempts=5):
+    """urlopen with a User-Agent, retrying refusals and server errors with back-off."""
+    import time
+    import urllib.error
+
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    for i in range(attempts):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code not in (403, 429, 500, 502, 503, 504) or i == attempts - 1:
+                raise RuntimeError(f"HTTP {e.code} from {url}") from e
+            wait = 15 * 2**i
+            print(f"  HTTP {e.code} from {url}; retrying in {wait} s")
+            time.sleep(wait)
 
 
 def download(url, dst):
