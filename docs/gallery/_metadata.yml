@@ -1,0 +1,5 @@
+execute:
+  # Gallery pages read remote stores. CI executes each one on its own
+  # under a hard time limit (scripts/render_gallery.py); the full site
+  # render then reuses those results instead of reading the stores again.
+  freeze: auto

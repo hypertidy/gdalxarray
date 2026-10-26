@@ -101,8 +101,9 @@ if live("oisst-mdim-zip"):
 assert dsn == store("oisst-mdim-zip")["dsn"]
 ```
 
-Each 27 June, in a one-degree box off eastern Tasmania. Only those
-days, 16 cells each, are read:
+Each 27 June, in a one-degree box off eastern Tasmania. The boolean
+selection reaches gdalxarray as a list of days, and it reads just those
+days (45 small reads), not the span from the first to the last:
 
 ```{python}
 #| error: true

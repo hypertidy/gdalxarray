@@ -167,7 +167,11 @@ def status_callout(key):
     s = store(key)
     st = STATUS.get(key, {})
     miss = missing_capabilities(key)
-    if miss:
+    skipped = os.environ.get("GDALXARRAY_DOCS_OFFLINE")
+    if skipped:
+        kind, head = "warning", "Not run in this build"
+        why = (skipped if len(skipped) > 1 else "remote cells were switched off for this build") + "."
+    elif miss:
         kind, head = "warning", "Not run in this build"
         why = "this GDAL lacks " + ", ".join(f"`{m}`" for m in miss) + "."
     elif st.get("ok"):
