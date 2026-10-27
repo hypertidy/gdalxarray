@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The multidim path now carries the metadata a writer needs to reproduce
+  the source. Found by round-tripping a multidim VRT of GHRSST MUR COGs
+  through gdalxarray into a VRT writer:
+  - **CRS**: each array's `GetSpatialRef()` is attached the way the classic
+    path does it (an xproj `CRSIndex` on a scalar `crs` coordinate), plus a
+    CF `crs_wkt` attribute on that coordinate and `grid_mapping="crs"` on
+    the data variables. Previously the multidim path dropped the CRS.
+  - **Time encoding**: decoded time coordinates keep `units`, `calendar` and
+    the stored `dtype` in `.encoding`, as xarray's own decoder does.
+  - **Units**: `GetUnit()` reaches `attrs["units"]` on data variables and
+    non-time coordinates (it was read only to decode time).
+  - **Dimension types**: GDAL's `HORIZONTAL_X` / `HORIZONTAL_Y` / `VERTICAL`
+    / `TEMPORAL` become CF `axis` X / Y / Z / T on the index coordinates.
+
 ### Added
 
 - CF-1.8 geometry containers now reach xarray in the multidim path, so a
