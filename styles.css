@@ -1,0 +1,27 @@
+/* gdalxarray site: small adjustments on top of the cosmo/darkly themes. */
+
+.cell-output-display table {
+  font-size: 0.85rem;
+}
+
+.cell-output-stdout pre,
+.cell-output pre {
+  font-size: 0.8rem;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+/* xarray's HTML repr reads better without the theme's table borders. */
+.xr-wrap table {
+  border: none;
+}
+
+figure.figure img {
+  max-width: 100%;
+  height: auto;
+}
+
+.footer-versions {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
