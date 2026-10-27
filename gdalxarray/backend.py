@@ -62,6 +62,15 @@ _GDAL_NUMPY_DTYPES = {
 }
 
 
+# GDAL dimension types -> CF ``axis`` values.
+_DIM_TYPE_AXIS = {
+    "HORIZONTAL_X": "X",
+    "HORIZONTAL_Y": "Y",
+    "VERTICAL": "Z",
+    "TEMPORAL": "T",
+}
+
+
 def _is_time_coord(array_name: str, attrs: dict, units: str | None) -> bool:
     """Recognise a time coordinate via CF conventions or a 'units since' string."""
     if attrs.get("axis") == "T":
@@ -71,6 +80,39 @@ def _is_time_coord(array_name: str, attrs: dict, units: str | None) -> bool:
     if array_name.lower() == "time":
         return True
     return bool(units and " since " in units)
+
+
+def _attach_mdim_crs(ds: xr.Dataset, srs_wkt: dict) -> xr.Dataset:
+    """Attach the md arrays' spatial reference, as the classic path does.
+
+    Same shape as the classic raster path (an xproj ``CRSIndex`` on a scalar
+    ``crs`` coordinate), plus the CF spelling (``crs_wkt`` on that coordinate,
+    ``grid_mapping="crs"`` on each data variable that carries the SRS) so
+    readers that follow CF conventions (rioxarray, writers that emit VRT or
+    netCDF) find it too.
+
+    Arrays with differing SRSs cannot share one CRS index: the most common
+    one is attached and the others are reported in a warning.
+    """
+    if not srs_wkt or "crs" in ds.variables:
+        return ds
+    counts: dict[str, int] = {}
+    for w in srs_wkt.values():
+        counts[w] = counts.get(w, 0) + 1
+    wkt = max(counts, key=counts.get)
+    others = sorted(v for v, w in srs_wkt.items() if w != wkt)
+    if others:
+        warnings.warn(
+            f"arrays {others} have a different spatial reference from the "
+            "others; only the most common one is attached as the dataset CRS",
+            UserWarning,
+            stacklevel=4,
+        )
+    ds = ds.proj.assign_crs(crs=wkt).proj.write_crs_info()
+    for v, w in srs_wkt.items():
+        if w == wkt and v in ds.data_vars:
+            ds[v].attrs.setdefault("grid_mapping", "crs")
+    return ds
 
 
 def _hidden_geometry_containers(group, listed: list[str]) -> list[str]:
@@ -1324,6 +1366,9 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
         data_vars = {}
         coords = {}
+        time_encoding = {}  # coord name -> CF encoding of a decoded time axis
+        srs_wkt = {}  # data var name -> WKT of the array's spatial reference
+        dim_axis = {}  # dim name -> CF axis from GDAL's dimension type
         synthesized = set()  # dims given a placeholder np.arange index
         geometry_dims = set()  # dims a CF geometry container will decode into
         has_geometry = False  # any CF geometry container present
@@ -1343,6 +1388,10 @@ class GDALBackendEntrypoint(BackendEntrypoint):
 
             dims = mdarray.GetDimensions()
             dim_names = [dim.GetName() or f"dim_{i}" for i, dim in enumerate(dims)]
+            for dim, dim_name in zip(dims, dim_names, strict=False):
+                axis = _DIM_TYPE_AXIS.get(dim.GetType() or "")
+                if axis:
+                    dim_axis.setdefault(dim_name, axis)
 
             # Backend array holds refs to parent dataset/group so the mdarray
             # stays valid for the lifetime of the resulting xarray Dataset.
@@ -1396,12 +1445,27 @@ class GDALBackendEntrypoint(BackendEntrypoint):
                     tuple(slice(None) for _ in backend_array.shape)
                 )
                 units = mdarray.GetUnit()
-                if _is_time_coord(array_name, attrs, units):
-                    calendar = attrs.get("calendar", "standard")
-                    if units:
-                        coord_data = decode_cf_datetime(coord_data, units, calendar)
+                if _is_time_coord(array_name, attrs, units) and units and " since " in units:
+                    calendar = attrs.pop("calendar", "standard")
+                    raw_dtype = coord_data.dtype
+                    coord_data = decode_cf_datetime(coord_data, units, calendar)
+                    # Keep the CF encoding, as xarray's own decoder does, so
+                    # writers can reproduce the stored values exactly.
+                    time_encoding[array_name] = {
+                        "units": units,
+                        "calendar": calendar,
+                        "dtype": raw_dtype,
+                    }
+                elif units:
+                    attrs.setdefault("units", units)
                 coords[array_name] = xr.DataArray(coord_data, dims=dim_names, attrs=attrs)
             else:
+                unit = mdarray.GetUnit()
+                if unit:
+                    attrs.setdefault("units", unit)
+                srs = mdarray.GetSpatialRef()
+                if srs is not None:
+                    srs_wkt[array_name] = srs.ExportToWkt(["FORMAT=WKT2_2019"])
                 data_vars[array_name] = xr.DataArray(data, dims=dim_names, attrs=attrs)
                 data_vars[array_name].encoding["preferred_chunks"] = preferred_chunks
                 # Create simple index coordinate for any dimension without one
@@ -1444,6 +1508,14 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             ds.encoding["gdal_driver"] = driver_name
 
         ds = xr.decode_cf(ds, decode_times=False, mask_and_scale=mask_and_scale)
+
+        for name, enc in time_encoding.items():
+            if name in ds.variables:
+                ds[name].encoding.update(enc)
+        for dim_name, axis in dim_axis.items():
+            if dim_name in ds.coords and dim_name not in synthesized:
+                ds[dim_name].attrs.setdefault("axis", axis)
+        ds = _attach_mdim_crs(ds, srs_wkt)
         return ds
 
     # ------------------------------------------------------------------
