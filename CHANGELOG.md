@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- Allow rasterix 0.3 (`rasterix>=0.2,<0.4`); the test suite passes against
+  it unchanged.
+- The classic-raster `RasterIndex` now carries the dataset CRS (it was
+  attached only as a separate xproj `CRSIndex`, so the index itself reported
+  `crs=None` until `rasterix.assign_index()` was called again).
 - The multidim path now carries the metadata a writer needs to reproduce
   the source. Found by round-tripping a multidim VRT of GHRSST MUR COGs
   through gdalxarray into a VRT writer:

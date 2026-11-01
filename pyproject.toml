@@ -43,7 +43,7 @@ requires-python = ">=3.11"
 dependencies = [
     "packaging",
     "affine",
-    "rasterix>=0.2,<0.3",
+    "rasterix>=0.2,<0.4",
     "xarray>=2025.6",
     "numpy",
     "xproj",
