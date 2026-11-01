@@ -1138,12 +1138,15 @@ class GDALBackendEntrypoint(BackendEntrypoint):
             )
 
         geotransform = dataset.GetGeoTransform()
+        projection = dataset.GetProjection()
+        # The CRS goes on the RasterIndex as well as on the CRSIndex below, so
+        # the index carries it without a further rasterix.assign_index().
         index = RasterIndex.from_transform(
             Affine.from_gdal(*geotransform),
             width=dataset.RasterXSize,
             height=dataset.RasterYSize,
+            crs=projection or None,
         )
-        projection = dataset.GetProjection()
         driver_name = dataset.GetDriver().GetDescription() if dataset.GetDriver() else None
         num_bands = dataset.RasterCount
 

@@ -234,3 +234,16 @@ def test_cf_scale_and_fillvalue_applied(synthetic_geotiff_with_scale):
     assert ds.band_data.values[0, 50, 50] == pytest.approx(10.0)
     # -999 → NaN
     assert np.isnan(ds.band_data.values[0, 0, 0])
+
+
+# -- CRS on the RasterIndex -------------------------------------------------
+
+
+def test_raster_index_carries_crs(backend, synthetic_geotiff):
+    from rasterix import RasterIndex
+
+    ds = backend.open_dataset(synthetic_geotiff, multidim=False)
+    index = ds.xindexes["x"]
+    assert isinstance(index, RasterIndex)
+    assert index.crs is not None
+    assert index.crs == ds.proj.crs
